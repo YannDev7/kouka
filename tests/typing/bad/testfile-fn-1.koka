@@ -1,0 +1,2 @@
+fun main() { fn (x: int, x: int) {} }
+
