@@ -1,6 +1,10 @@
 (ocamllex
  (modules lexer))
 (menhir
- (modules parser))
+ (modules parser)
+ (flags (--explain --dump)))
 (executable
- (name koka))
+ (name koka)
+ (promote (until-clean))
+ (flags ())
+ )

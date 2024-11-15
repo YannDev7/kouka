@@ -19,21 +19,21 @@ KOKA="koka --console=raw -v0"
 
 # tous les tests passent avec Koka
 test_koka() {
-for f in typing/bad/*.koka; do
-    # if test $f == typing/bad/testfile-main-1.koka; then continue; fi
+for f in /tests/typing/bad/*.koka; do
+    # if test $f == /tests/typing/bad/testfile-main-1.koka; then continue; fi
     if $KOKA -c $f > /dev/null 2>&1 ; then
       echo "succÃ¨s de koka sur $f"; exit 1
     fi
 done
-for f in typing/good/*.koka; do
+for f in /tests/typing/good/*.koka; do
     $KOKA $f > /dev/null ||
      (echo "echec de koka sur $f"; exit 1)
 done
-for f in exec/*.koka; do
+for f in /tests/exec/*.koka; do
     $KOKA -e $f > /dev/null ||
      (echo "echec de koka sur $f"; exit 1)
 done
-for f in exec-fail/*.koka; do
+for f in /tests/exec-fail/*.koka; do
     $KOKA -c $f > /dev/null ||
         (echo "echec de koka sur $f"; exit 1)
     if $KOKA -e $f > /dev/null 2>&1 ; then
@@ -65,7 +65,7 @@ echo "Partie 1"
 
 # les mauvais
 echo -n "mauvais "
-for f in syntax/bad/*.koka; do
+for f in /tests/syntax/bad/*.koka; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --parse-only $f;
@@ -83,7 +83,7 @@ echo
 
 # les bons
 echo -n "bons "
-for f in syntax/good/*.koka typing/bad/*.koka typing/good/*.koka exec/*.koka exec-fail/*.koka; do
+for f in /tests/syntax/good/*.koka /tests/typing/bad/*.koka /tests/typing/good/*.koka /tests/exec/*.koka /tests/exec-fail/*.koka; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --parse-only $f;
@@ -116,7 +116,7 @@ max=0
 
 # les mauvais
 echo -n "mauvais "
-for f in typing/bad/*.koka; do
+for f in /tests/typing/bad/*.koka; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --type-only $f;
@@ -134,7 +134,7 @@ echo
 
 # les bons
 echo -n "bons "
-for f in typing/good/*.koka exec/*.koka exec-fail/*.koka; do
+for f in /tests//tests/typing/good/*.koka /tests/exec/*.koka /tests/exec-fail/*.koka; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --type-only $f;
@@ -173,12 +173,12 @@ echo "-----------------"
 
 timeout="why3-cpulimit 30 0 -h"
 
-for f in exec/*.koka; do
-    rm -f *.s exec/*.s
+for f in /tests/exec/*.koka; do
+    rm -f *.s /tests/exec/*.s
     echo -n "."
-    asm=exec/`basename $f .koka`.s
+    asm=/tests/exec/`basename $f .koka`.s
     rm -f $asm
-    expected=exec/`basename $f .koka`.out
+    expected=/tests/exec/`basename $f .koka`.out
     max=`expr $max + 1`;
     if compile $f; then
 	rm -f out
@@ -205,9 +205,9 @@ echo
 echo "Execution conduisant Ã  un Ã©chec"
 echo "-------------------------------"
 
-for f in exec-fail/*.koka; do
+for f in /tests/exec-fail/*.koka; do
     echo -n "."
-    asm=exec-fail/`basename $f .koka`.s
+    asm=/tests/exec-fail/`basename $f .koka`.s
     rm -f $asm
     max=`expr $max + 1`;
     if compile $f && gcc -no-pie $asm; then
@@ -249,9 +249,9 @@ echo "-----------------"
 
 timeout="why3-cpulimit 30 0 -h"
 
-for f in exec/*.koka; do
+for f in /tests/exec/*.koka; do
     echo -n "."
-    expected=exec/`basename $f .koka`.out
+    expected=/tests/exec/`basename $f .koka`.out
     max=`expr $max + 1`;
     rm -f out
     if $compilo $f > out; then
@@ -271,7 +271,7 @@ echo
 echo "Execution conduisant Ã  un Ã©chec"
 echo "-------------------------------"
 
-for f in exec-fail/*.koka; do
+for f in /tests//tests/exec-fail/*.koka; do
     echo -n "."
     max=`expr $max + 1`;
     if $compilo $f > /dev/null 2>&1; then
