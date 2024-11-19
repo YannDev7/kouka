@@ -8,7 +8,7 @@
         let kws = Hashtbl.create 42 in
         List.iter (fun (name, token) -> Hashtbl.add kws name token) 
             [
-                ("fun", FUN); ("main", MAIN)
+                ("fun", FUN)
             ];
         fun s -> try Hashtbl.find kws s with | Not_found -> IDENT s
 
@@ -33,12 +33,15 @@ let comment_line = "//" [^'\n']*
 rule next_tokens = parse
     | '\n' { new_line lexbuf; next_tokens lexbuf }
     | (space | comment_line)+ { pp_lexbuf lexbuf; next_tokens lexbuf }
-    | ident as id { pp_lexbuf lexbuf; kwd_or_id id }
     | "/*" { comment lexbuf }
     | "{" { LBRACE }
-    | "}" { RBRACE }
+    | "}" { pp_lexbuf lexbuf; RBRACE }
     | "(" { LPAR }
     | ")" { RPAR }
+    | "," { COMMA }
+    | ";" { SEMICOLON }
+    | ":" { COLON }
+    | ident as id { pp_lexbuf lexbuf; kwd_or_id id }
     | eof { EOF }
 and comment = parse
     | "*/" { next_tokens lexbuf }
