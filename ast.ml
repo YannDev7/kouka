@@ -8,6 +8,7 @@ type binop =
   | Add | Sub | Mul | Div | Mod
   (* &&     || *)
   | And | Or
+(* TODO: add more *)
 
 type atom =
   | AUnit
@@ -27,14 +28,17 @@ type expr =
   | EFn of funbody
 
 and stmt =
+  | SExpr of expr
   | SAssign of ident * expr
   | SUpdate of ident * expr
 
+and block = stmt list
+
 and kwutype =
   | KUnit
-  | KVar of ident
+  | KType of ident * kwutype (* TODO: list or not list ? *)
   | KProd of kwutype * kwutype
-  | KFun of kwutype * result
+  | KFun of kwutype list * result
 
 and result = ident list * kwutype
 

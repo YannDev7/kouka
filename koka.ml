@@ -13,7 +13,6 @@ let spec =
   [
     "--parse-only", Arg.Set parse_only, "  stop after parsing";
   ]
-
 let file =
   let file = ref None in
   let set_file s =
@@ -23,7 +22,7 @@ let file =
   in
   Arg.parse spec set_file usage;
   match !file with Some f -> f | None -> Arg.usage spec usage; exit 1
-
+  
 let report (b,e) =
   let l = b.pos_lnum in
   let fc = b.pos_cnum - b.pos_bol + 1 in

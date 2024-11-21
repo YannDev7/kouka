@@ -1,1 +1,1 @@
-fun main(a, b) {} //
+fun main-A(a : int, b: bool) : <div> list<b> {} //
