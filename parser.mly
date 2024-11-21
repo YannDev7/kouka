@@ -22,7 +22,7 @@
 
 (* TODO: add SEMICOLON+ instead of SEMICOLON* *)
 file:
-| SEMICOLON* dl = separated_list(SEMICOLON+, decl) SEMICOLON* EOF { dl }
+| SEMICOLON* dl = list(de = decl SEMICOLON+ { de }) EOF { dl }
 ;
 
 decl:
@@ -54,9 +54,13 @@ param:
 typ:
 | t = atyp { t }
 | args_t = atyp ARROW res_t = result { KFun ([args_t], res_t) }
-| LPAR args_t = separated_list(COMMA, typ) RPAR ARROW res_t = result { KFun (args_t, res_t) }
+| args_t = typ_ls ARROW res_t = result { KFun (args_t, res_t) }
 ;
 
+(* conflicts between atyp -> res vs (typ ls) -> res
+when ls of size 1... 
+
+idea: type list ? *)
 atyp:
 | LPAR RPAR { KUnit }
 | LPAR t = typ RPAR { t } 
@@ -65,6 +69,9 @@ atyp:
                                   | Some st -> KType (id, st)
                               }
 ;
+
+typ_ls:
+| LPAR args_t = separated_list(COMMA, typ) RPAR { args_t }
 
 lt_typ_gt:
 | LT t = typ GT { t } 
