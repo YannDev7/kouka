@@ -8,9 +8,23 @@
 %token SEMICOLON, COMMA, COLON
 %token LBRACE, RBRACE
 %token LPAR, RPAR
-%token FUN, ARROW
-%token LT, GT
+%token IF, THEN, ELIF, ELSE, FUN, ARROW
+%token LT, LEQ, GT, GEQ
+%token VAL, VAR, ASSIGN, UPDATE
+%token ADD, SUB, MUL, DIV, MOD, PPLUS
+%token DEQ, NEQ
+%token AND, OR
 %token <string> IDENT
+%token <Ast.atom> ATOM
+
+/* max priority down */
+
+// then moins prio que else et elif
+%left OR
+%left AND
+%nonassoc UPDATE, DEQ, NEQ, LT, LEQ, GT, GEQ
+%left ADD SUB PPLUS
+%left MUL DIV MOD
 
 /* Point d'entrée de la grammaire */
 %start file
@@ -32,6 +46,8 @@ decl:
 ident:
 id = IDENT { id }
 ;
+
+(* MATCHING FUNCTIONS AND ARGS *)
 
 /* TODO: add annot */
 funbody:
@@ -71,17 +87,17 @@ we make common prefix in same rule
 typ:
 | t = atyp { t }
 | LPAR t = typ RPAR { t } 
-| args_t = atyp ARROW res_t = result { KFun([args_t], res_t) }
-| LPAR t1 = typ RPAR ARROW res_t = result { KFun([t1], res_t) }
+| args_t = atyp ARROW res_t = result { KFun ([args_t], res_t) }
+| LPAR t1 = typ RPAR ARROW res_t = result { KFun ([t1], res_t) }
 | LPAR t1 = typ COMMA args_t = separated_nonempty_list(COMMA, typ) RPAR ARROW res_t = result { KFun (t1::args_t, res_t) }
 ;
 
 atyp:
 | LPAR RPAR { KUnit }
 | id = ident t = lt_typ_gt? { match t with
-                                  | None -> KType (id, KUnit)
-                                  | Some st -> KType (id, st)
-                              }
+                                | None -> KType (id, KUnit)
+                                | Some st -> KType (id, st)
+                            }
 ;
 
 lt_typ_gt:
@@ -100,16 +116,48 @@ lt_ident_ls_gt:
 | LT id_ls = separated_list(COMMA, ident) GT { id_ls } 
 ;
 
+(* EXPR BLOCKS STMT *)
 
 expr:
-| block { ECst AUnit }
-| bexpr { ECst AUnit }
+| b = block { EBlock b }
+| e = bexpr { e }
 ;
 
 bexpr:
-| EOF { ECst AUnit }
+| a = atom { ECst a }
+| e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
+;
+
+(* TODO: handle string in lexer, and other atom rules *)
+(* unit cringe *)
+atom:
+| a = ATOM { a }
+| id = ident { AVar id }
+| LPAR RPAR { AUnit }
 ;
 
 block:
-| LBRACE  SEMICOLON* RBRACE { ECst AUnit }
+| LBRACE SEMICOLON* ls = separated_list(COMMA+, stmt) RBRACE { ls }
 ;
+
+stmt:
+| e = bexpr { SExpr e }
+| VAR id = ident ASSIGN e = expr { SAssign (id, e) }
+| VAL id = ident UPDATE e = expr { SUpdate (id, e) }
+;
+
+%inline binop:
+| DEQ { Eq }
+| NEQ { Neq }
+| LT { Lt }
+| LEQ { Leq }
+| GT { Gt }
+| GEQ { Geq }
+| ADD { Add }
+| SUB { Sub }
+| MUL { Mul }
+| DIV { Div }
+| MOD { Mod }
+| AND { And }
+| OR { Or }
+| PPLUS { Pplus }

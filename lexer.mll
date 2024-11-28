@@ -1,6 +1,7 @@
 {
     open Parser
     open Lexing
+    open Ast
 
     exception Lexing_error of string
 
@@ -23,7 +24,8 @@
         let kws = Hashtbl.create 42 in
         List.iter (fun (name, token) -> Hashtbl.add kws name token) 
             [
-                ("fun", FUN)
+                ("fun", FUN); ("val", VAL); ("var", VAR); ("if", IF);
+                ("then", THEN); ("elif", ELIF); ("else", ELSE)
             ];
         fun s -> try Hashtbl.find kws s with | Not_found -> IDENT s
 
@@ -39,12 +41,15 @@
 
 (* a5 - 6 vs a5-6 wtf ???? *)
 let digit = ['0'-'9']
+let integer = ['0'-'9']*
 let lower = ['a'-'z'] | '_'
 let upper = ['A'-'Z']
 let other = lower | upper | digit | '-'
 let ident = lower other* "'"* (* TODO: check if it works *)
 let space = [' ' '\t'] (* TODO: handle indentation *)
 let comment_line = "//" [^'\n']*
+
+(* TODO: add string handling *)
 
 rule next_tokens = parse
     | '\n' { new_line lexbuf; next_tokens lexbuf }
@@ -60,8 +65,32 @@ rule next_tokens = parse
     | "->" { ARROW }
     | "<" { LT }
     | ">" { GT }
+    | "+" { ADD }
+    | "-" { SUB }
+    | "*" { MUL }
+    | "/" { DIV }
+    | "%" { MOD }
+    | "==" { DEQ }
+    | "!=" { NEQ }
+    | "<" { LT }
+    | "<=" { LEQ }
+    | ">" { GT }
+    | ">=" { GEQ }
+    | "&&" { AND }
+    | "||" { OR }
+    | "++" { PPLUS }
+    | "=" { ASSIGN }
+    | ":=" { UPDATE }
+    | "True" { ATOM (ABool true) }
+    | "False" { ATOM (ABool false) }
     | ident as id { if not (valid_ident id) then failwith "[Error]: Invalid ident name";
                     pp_lexbuf lexbuf; kwd_or_id id }
+    | integer as s 
+        {
+            pp_lexbuf lexbuf;
+            try ATOM (AInt (int_of_string s))
+            with _ -> raise (Lexing_error ("constant too large: " ^ s))
+        }
     | eof { EOF }
 and comment = parse
     | "*/" { next_tokens lexbuf }

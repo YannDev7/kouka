@@ -3,11 +3,13 @@ type pos = Lexing.position * Lexing.position (* TODO: add pos for errors*)
 
 type binop =
   (* =     !=     <     <=     >     >= *)
-  | Eq | Neq | Lt | Leq | Gt | Ge
+  | Eq | Neq | Lt | Leq | Gt | Geq
   (*  +      -     *       /      %  *)
   | Add | Sub | Mul | Div | Mod
   (* &&     || *)
   | And | Or
+  (*++*)
+  | Pplus
 (* TODO: add more *)
 
 type atom =
@@ -25,6 +27,7 @@ type expr =
   | EAssign of ident * expr
   | EReturn of expr
   | EIf_then_else of expr *  expr * expr
+  | EBlock of block
   | EFn of funbody
 
 and stmt =
