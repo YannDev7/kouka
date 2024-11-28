@@ -60,8 +60,7 @@ rule next_tokens = parse
     | "->" { ARROW }
     | "<" { LT }
     | ">" { GT }
-    | ident as id { if not (valid_ident id) then failwith "[Error]: Invalid
-                                                        ident name";
+    | ident as id { if not (valid_ident id) then failwith "[Error]: Invalid ident name";
                     pp_lexbuf lexbuf; kwd_or_id id }
     | eof { EOF }
 and comment = parse

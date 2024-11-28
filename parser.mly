@@ -51,27 +51,38 @@ param:
 | pname = ident COLON typ { pname }
 ;
 
-typ:
-| t = atyp { t }
-| args_t = atyp ARROW res_t = result { KFun ([args_t], res_t) }
-| args_t = typ_ls ARROW res_t = result { KFun (args_t, res_t) }
-;
 
-(* conflicts between atyp -> res vs (typ ls) -> res
+(* conflicts between (atyp) -> res vs (typ ls) -> res
 when ls of size 1... 
 
-idea: type list ? *)
+idea: type list ? 
+sol: we retard reading the comma!
+if we read at least one type and then something with comma*)
+
+(*
+conflict with (typ) via atyp -> or not ->?
+=> ltyp reads whatever is on the left
+and then we have ltyp ->
+
+we match (typ, non empty list)
+we make common prefix in same rule
+*)
+
+typ:
+| t = atyp { t }
+| LPAR t = typ RPAR { t } 
+| args_t = atyp ARROW res_t = result { KFun([args_t], res_t) }
+| LPAR t1 = typ RPAR ARROW res_t = result { KFun([t1], res_t) }
+| LPAR t1 = typ COMMA args_t = separated_nonempty_list(COMMA, typ) RPAR ARROW res_t = result { KFun (t1::args_t, res_t) }
+;
+
 atyp:
 | LPAR RPAR { KUnit }
-| LPAR t = typ RPAR { t } 
 | id = ident t = lt_typ_gt? { match t with
                                   | None -> KType (id, KUnit)
                                   | Some st -> KType (id, st)
                               }
 ;
-
-typ_ls:
-| LPAR args_t = separated_list(COMMA, typ) RPAR { args_t }
 
 lt_typ_gt:
 | LT t = typ GT { t } 
