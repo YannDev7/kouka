@@ -4,8 +4,8 @@
 
 /* Définitions des priorités et associativités des tokens */
 
-%token EOF
-%token SEMICOLON, COMMA, COLON
+%token NEWLINE, EOF
+%token SEMICOLON, COMMA, COLON, DOT
 %token LBRACE, RBRACE
 %token LPAR, RPAR
 %token IF, THEN, ELIF, ELSE, FUN, ARROW
@@ -137,7 +137,7 @@ atom:
 ;
 
 block:
-| LBRACE SEMICOLON* ls = separated_list(COMMA+, stmt) RBRACE { ls }
+| LBRACE SEMICOLON* ls = list(dst = stmt SEMICOLON+ { dst }) RBRACE { ls }
 ;
 
 stmt:

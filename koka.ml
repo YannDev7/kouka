@@ -33,7 +33,7 @@ let () =
   let c = open_in file in
   let lb = Lexing.from_channel c in
   try
-    let _f = Parser.file Lexer.next_tokens lb in
+    let _f = Parser.file Lexer.next_token lb in
     close_in c;
     if !parse_only then exit 0;
     (*Interp.file f*)
