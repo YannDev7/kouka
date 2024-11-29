@@ -32,7 +32,7 @@
         List.iter (fun (name, token) -> Hashtbl.add kws name token) 
             [
                 ("fun", FUN); ("val", VAL); ("var", VAR); ("if", IF);
-                ("then", THEN); ("elif", ELIF); ("else", ELSE)
+                ("then", THEN); ("elif", ELIF); ("else", ELSE); ("fn", FN)
             ];
         fun s -> try Hashtbl.find kws s with | Not_found -> IDENT s
 }
@@ -42,6 +42,8 @@
 
     a + b - a+b
     a+b-a+b
+
+    TODO: fun main() fn () avec autre chose que fn (i.e un appel)
 *)
 let digit = ['0'-'9']
 let integer = ['0'-'9']*
@@ -174,6 +176,6 @@ and comment = parse
             end;
 
             let ans = Queue.pop tokens in
-            (*pp_tok Format.std_formatter ans;*)
+            pp_tok Format.std_formatter ans;
             ans
 }

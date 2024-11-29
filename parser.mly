@@ -8,7 +8,7 @@
 %token SEMICOLON, COMMA, COLON, DOT
 %token LBRACE, RBRACE
 %token LPAR, RPAR
-%token IF, THEN, ELIF, ELSE, FUN, ARROW
+%token IF, THEN, ELIF, ELSE, FUN, FN, ARROW
 %token LT, LEQ, GT, GEQ
 %token VAL, VAR, ASSIGN, UPDATE
 %token ADD, SUB, MUL, DIV, MOD, PPLUS
@@ -124,16 +124,17 @@ expr:
 ;
 
 bexpr:
-| a = atom { ECst a }
+| a = atom { a }
 | e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
 ;
 
 (* TODO: handle string in lexer, and other atom rules *)
 (* unit cringe *)
 atom:
-| a = ATOM { a }
-| id = ident { AVar id }
-| LPAR RPAR { AUnit }
+| a = ATOM { ECst a }
+| id = ident { ECst (AVar id) }
+| LPAR RPAR { ECst AUnit }
+| a = atom LPAR ls = separated_list(COMMA, expr) RPAR { ECall (a, ls) }
 ;
 
 block:
