@@ -6,6 +6,10 @@
 
     exception Lexing_error of string
 
+    let c = ref 0
+
+    let col_num lb = lb.lex_curr_p.pos_cnum - lb.lex_curr_p.pos_bol
+
     let valid_ident s =
         let len = String.length s in
         let ok = ref true in
@@ -50,7 +54,7 @@ let comment_line = "//" [^'\n']*
 
 rule next_tokens = parse
     | '\n' { new_line lexbuf; NEWLINE }
-    | (space | comment_line)+ { (*pp_lexbuf lexbuf;*) next_tokens lexbuf }
+    | (space | comment_line)+ { (*pp_lexbuf lexbuf;*) c := col_num lexbuf; next_tokens lexbuf }
     | "/*" { comment lexbuf }
     | "{" { LBRACE }
     | "}" { (*pp_lexbuf lexbuf;*) RBRACE }
@@ -90,9 +94,9 @@ rule next_tokens = parse
         }
     | eof { EOF }
 and comment = parse
-    | "*/" { next_tokens lexbuf }
-    | "\n" { new_line lexbuf; comment lexbuf }
-    | _ { comment lexbuf }
+    | "*/" { c := col_num lexbuf; next_tokens lexbuf }
+    | "\n" { new_line lexbuf; c := col_num lexbuf; comment lexbuf }
+    | _ { c := col_num lexbuf; comment lexbuf }
     | eof { failwith "Comment without end..." }
 
 {
@@ -110,49 +114,64 @@ and comment = parse
         let tokens = Queue.create () in
         let ident_st = Stack.create () in
         let emit tok =
+            (* pp_tok Format.std_formatter tok; *)
             if tok = RBRACE then Queue.push SEMICOLON tokens;
             Queue.push tok tokens;
             last := tok in
         Stack.push 0 ident_st;
 
         fun lb ->
-            let col_num () = lb.lex_curr_p.pos_cnum - lb.lex_curr_p.pos_bol in
+            c := 0;
+            let eat () =
+                c := col_num lb; (* Important! to make sure the column corresponds
+                                    to the beginning of the token *)
+                let tok = next_tokens lb in
+                (*pp_tok Format.std_formatter (ATOM (AInt !c));
+                pp_tok Format.std_formatter tok;*)
+                tok in
+
             if Queue.is_empty tokens then begin
                 let rec act action = function
-                    | NEWLINE -> act true (next_tokens lb)
-                    | next when action = false -> emit next
+                    | NEWLINE -> act true (eat ())
+                    (* TODO: newline before EOF ? *)
+                    | next when action = false -> if next = EOF then act true EOF
+                                                  else emit next
                     | next when action = true ->
-                        let c = (if next = EOF then 0 else col_num ()) in
+                        if next = EOF then c := 0;
                         let m = Stack.top ident_st in
-                        if c > m then begin
+                        if !c > m then begin
                             if not (end_of_cont !last) && not (beg_of_cont next) then begin
                                 emit LBRACE;
                                 (* Queue.push SEMICOLON tokens; lecture du sujet *)
                             end;
                             
                             if !last = LBRACE then
-                                Stack.push c ident_st;
+                                Stack.push !c ident_st;
 
                             emit next;
                         end else begin
-                            while c < Stack.top ident_st do
+                            while !c < Stack.top ident_st do
                                 ignore(Stack.pop ident_st);
                                 if next <> RBRACE then begin
                                     emit RBRACE;
                                 end
                             done;
 
-                            if c > m then raise (Lexing_error "Indentation error");
+                            if !c > Stack.top ident_st then raise (Lexing_error "Indentation error");
 
                             if not (end_of_cont !last) && not (beg_of_cont next) then
+                                (*pp_tok Format.std_formatter (ATOM (AInt !c));
+                                pp_tok Format.std_formatter !last;
+                                pp_tok Format.std_formatter (ATOM (AInt !c));
+                                pp_tok Format.std_formatter next;*)
                                 emit SEMICOLON;
                             emit next;
                         end 
                     | _ -> failwith "plz no warning"
-                in act false (next_tokens lb)
+                in act false (eat ())
             end;
 
             let ans = Queue.pop tokens in
-            (*in pp_tok Format.std_formatter ans;*)
+            (*pp_tok Format.std_formatter ans;*)
             ans
 }

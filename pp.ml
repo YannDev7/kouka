@@ -24,7 +24,8 @@ let pp_tok fmt = function
   | LPAR -> fprintf fmt "("
   | RPAR -> fprintf fmt ")"
   | COMMA -> fprintf fmt ","
-  | SEMICOLON -> fprintf fmt ";\n"
+  | SEMICOLON -> fprintf fmt ";"
   | ATOM a -> pp_atom fmt a
+  | NEWLINE -> fprintf fmt "\nNEWLINE\n";
   | EOF -> fprintf fmt "\neof\n";
   | _ -> fprintf fmt "? "
