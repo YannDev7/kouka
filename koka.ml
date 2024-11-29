@@ -4,6 +4,7 @@ open Format
 open Lexing
 open Parser
 open Lexer
+open Exception
 
 let usage = "usage: koka [options] file.koka"
 
@@ -46,6 +47,10 @@ let () =
 	report (lexeme_start_p lb, lexeme_end_p lb);
 	eprintf "syntax error@.";
 	exit 1
+    | Block_not_end_expr ->
+  report (lexeme_start_p lb, lexeme_end_p lb);
+  eprintf "syntax error, block not ending with expr@.";
+  exit 1
     | e ->
 	eprintf "Anomaly: %s\n@." (Printexc.to_string e);
 	exit 2

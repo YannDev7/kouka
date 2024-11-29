@@ -1,5 +1,21 @@
 %{
   open Ast
+  open Exception
+
+  (* cringe case when last stmt of block is expr... *)
+  let rec not_last_exp = function
+    | [] -> false
+    | [v] ->
+      begin
+        match v with
+          | SExpr e -> false
+          | _ -> true
+      end
+    | hd::tl -> not_last_exp tl
+
+  let is_ok_block ls =
+    if not_last_exp ls then raise Block_not_end_expr
+    else ()
 %}
 
 /* Définitions des priorités et associativités des tokens */
@@ -138,13 +154,14 @@ atom:
 ;
 
 block:
-| LBRACE SEMICOLON* ls = list(dst = stmt SEMICOLON+ { dst }) RBRACE { ls }
+| LBRACE SEMICOLON* ls = list(dst = stmt SEMICOLON+ { dst }) RBRACE { is_ok_block ls;
+                                                                      ls }
 ;
 
 stmt:
 | e = bexpr { SExpr e }
-| VAR id = ident ASSIGN e = expr { SAssign (id, e) }
-| VAL id = ident UPDATE e = expr { SUpdate (id, e) }
+| VAL id = ident ASSIGN e = expr { SAssign (id, e) }
+| VAR id = ident UPDATE e = expr { SUpdate (id, e) }
 ;
 
 %inline binop:
