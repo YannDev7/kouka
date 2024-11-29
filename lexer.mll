@@ -13,14 +13,16 @@
     let valid_ident s =
         let len = String.length s in
         let ok = ref true in
-        let ban = [
+        let banS = [
             '0'; '1'; '2'; '3'; '4'; 
-            '5'; '6'; '7'; '8'; '9'
+            '5'; '6'; '7'; '8'; '9';
+            '-'; '_'
         ] in
+        let banF = ['-'; '_'] in
         for i = 0 to len - 1 do
             if s.[i] = '-' then begin
-                if i > 0 && List.mem s.[i - 1] ban then ok := false;
-                if i + 1 < len && List.mem s.[i - 1] ban then ok := false;
+                if (i = 0) || (List.mem s.[i - 1] banF) then ok := false;
+                if i + 1 < len && List.mem s.[i + 1] banS then ok := false;
             end
         done;
         !ok
@@ -84,7 +86,7 @@ rule next_tokens = parse
     | ":=" { UPDATE }
     | "True" { ATOM (ABool true) }
     | "False" { ATOM (ABool false) }
-    | ident as id { if not (valid_ident id) then failwith "[Error]: Invalid ident name";
+    | ident as id { if not (valid_ident id) then raise (Lexing_error "Invalid ident name");
                     (*pp_lexbuf lexbuf;*) kwd_or_id id }
     | integer as s 
         {
@@ -97,7 +99,7 @@ and comment = parse
     | "*/" { c := col_num lexbuf; next_tokens lexbuf }
     | "\n" { new_line lexbuf; c := col_num lexbuf; comment lexbuf }
     | _ { c := col_num lexbuf; comment lexbuf }
-    | eof { failwith "Comment without end..." }
+    | eof { raise (Lexing_error ("Comment without end...")) }
 
 {
     let next_token =
@@ -167,7 +169,7 @@ and comment = parse
                                 emit SEMICOLON;
                             emit next;
                         end 
-                    | _ -> failwith "plz no warning"
+                    | _ -> raise (Lexing_error "plz no warning")
                 in act false (eat ())
             end;
 

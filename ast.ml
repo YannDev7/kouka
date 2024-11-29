@@ -29,6 +29,7 @@ type expr =
   | EIf_then_else of expr *  expr * expr
   | EBlock of block
   | EFn of funbody
+  | ECall of ident * expr
 
 and stmt =
   | SExpr of expr
