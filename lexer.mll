@@ -8,6 +8,8 @@
 
     let c = ref 0
 
+    let buf = Buffer.create 4242
+
     let col_num lb = lb.lex_curr_p.pos_cnum - lb.lex_curr_p.pos_bol
 
     let valid_ident s =
@@ -32,7 +34,8 @@
         List.iter (fun (name, token) -> Hashtbl.add kws name token) 
             [
                 ("fun", FUN); ("val", VAL); ("var", VAR); ("if", IF);
-                ("then", THEN); ("elif", ELIF); ("else", ELSE); ("fn", FN)
+                ("then", THEN); ("elif", ELIF); ("else", ELSE); ("elif", ELIF);
+                ("fn", FN)
             ];
         fun s -> try Hashtbl.find kws s with | Not_found -> IDENT s
 }
@@ -88,6 +91,7 @@ rule next_tokens = parse
     | ":=" { UPDATE }
     | "True" { ATOM (ABool true) }
     | "False" { ATOM (ABool false) }
+    | "\"" { Buffer.clear buf; string lexbuf }
     | ident as id { if not (valid_ident id) then raise (Lexing_error "Invalid ident name");
                     (*pp_lexbuf lexbuf;*) kwd_or_id id }
     | integer as s 
@@ -102,6 +106,10 @@ and comment = parse
     | "\n" { new_line lexbuf; c := col_num lexbuf; comment lexbuf }
     | _ { c := col_num lexbuf; comment lexbuf }
     | eof { raise (Lexing_error ("Comment without end...")) }
+and string = parse
+    | "\"" { ATOM (AString (Buffer.contents buf)) }
+    | _ as c { Buffer.add_char buf c; string lexbuf }
+    | eof { raise (Lexing_error ("String without end quote...")) }
 
 {
     let next_token =

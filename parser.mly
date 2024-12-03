@@ -142,6 +142,7 @@ expr:
 bexpr:
 | a = atom { a }
 | e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
+(*| IF e1 = bexpr then e2 = expr*) 
 ;
 
 (* TODO: handle string in lexer, and other atom rules *)
