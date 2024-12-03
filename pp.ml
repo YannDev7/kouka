@@ -14,7 +14,7 @@ let pp_lexbuf lb =
 
 let pp_atom fmt = function
   | AInt i -> fprintf fmt "%d" i
-  | _ -> fprintf fmt "- "
+  | _ -> fprintf fmt "atom "
 
 let pp_tok fmt = function
   | FUN -> fprintf fmt "fun "
@@ -27,5 +27,7 @@ let pp_tok fmt = function
   | SEMICOLON -> fprintf fmt ";"
   | ATOM a -> pp_atom fmt a
   | NEWLINE -> fprintf fmt "\nNEWLINE\n";
+  | ASSIGN -> fprintf fmt "=\n";
+  | UPDATE -> fprintf fmt ":=\n";
   | EOF -> fprintf fmt "\neof\n";
   | _ -> fprintf fmt "? "

@@ -48,6 +48,7 @@
 %left ADD SUB PPLUS
 %left MUL DIV MOD
 %nonassoc TILDE, NOT
+%nonassoc FN
 
 /* Point d'entrée de la grammaire */
 %start file
@@ -73,7 +74,7 @@ id = IDENT { id }
 (* MATCHING FUNCTIONS AND ARGS *)
 
 /* TODO: add annot */
-funbody:
+%inline funbody:
 | LPAR fargs = separated_list(COMMA, param) RPAR res_t = annot? fcontent = expr {
     match res_t with
       | None -> { args = fargs; content = fcontent; tag = ([], KUnit) }
@@ -86,7 +87,7 @@ annot:
 ;
 
 /* TODO: COLON type */
-param:
+%inline param:
 | pname = ident COLON typ { pname }
 ;
 
@@ -151,12 +152,14 @@ bexpr:
 | NOT e = bexpr { ENot e }
 | a = atom { a }
 | e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
+| id = ident UPDATE e = bexpr { EAssign (id, e) }
 | IF e1 = bexpr THEN e2 = expr ELSE e3 = expr
   { 
     EIf_then_else (e1, e2, e3)
   }
 | IF e1 = bexpr THEN e2 = expr { EIf_then_else (e1, e2, EBlock []) }
 | IF e1 = bexpr RETURN e2 = expr { EIf_then_else (e1, EReturn e2, EBlock []) }
+| FN body = funbody { EFn body }
 | RETURN e = expr { EReturn e }
 ;
 
@@ -166,22 +169,19 @@ atom:
 | a = ATOM { ECst a }
 | id = ident { ECst (AVar id) }
 | LPAR RPAR { ECst AUnit }
-| a = atom DOT id = ident { ECall (ECst (AString id), [a]) }
+| a = atom DOT id = ident { ECall (ECst (AString id), [a]) } (* TODO CHECK E NOT CALL *)
 | a = atom LPAR ls = separated_list(COMMA, expr) RPAR { ECall (a, ls) }
 | LBRACKET ls = separated_list(COMMA, expr) RBRACKET { EList ls }
 | a = atom b = block 
   { 
-    ECall (
-      a,
-      [
-        EFn {
+    ECall (a,
+      [EFn {
           args = [];
           tag = ([], KUnit);
           content = EBlock b
-        }
-      ]
-    ) 
+        }]) 
   }
+| e = expr FN body = funbody { ECall (e, [EFn body]) }
 ;
 
 block:

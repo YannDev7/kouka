@@ -98,11 +98,17 @@ rule next_tokens = parse
     | "\"" { Buffer.clear buf; string lexbuf }
     | ident as id { if not (valid_ident id) then raise (Lexing_error "Invalid ident name");
                     (*pp_lexbuf lexbuf;*) kwd_or_id id }
+    | "-"integer as s (* TODO: fix spaghetti code *)
+        {
+            (*pp_lexbuf lexbuf;*)
+            try ATOM (AInt (-(int_of_string s)))
+            with _ -> raise (Lexing_error ("Constant too large: " ^ s))
+        }
     | integer as s 
         {
             (*pp_lexbuf lexbuf;*)
             try ATOM (AInt (int_of_string s))
-            with _ -> raise (Lexing_error ("constant too large: " ^ s))
+            with _ -> raise (Lexing_error ("Constant too large: " ^ s))
         }
     | eof { EOF }
 and comment = parse
@@ -111,7 +117,11 @@ and comment = parse
     | _ { c := col_num lexbuf; comment lexbuf }
     | eof { raise (Lexing_error ("Comment without end...")) }
 and string = parse
-    | "\"" { ATOM (AString (Buffer.contents buf)) }
+    | '"' { ATOM (AString (Buffer.contents buf)) }
+    | "\\\\" { Buffer.add_char buf '\\'; string lexbuf }
+    | "\\\"" { Buffer.add_char buf '\\'; Buffer.add_char buf '"'; string lexbuf }
+    | "\\t" { Buffer.add_char buf '\t'; string lexbuf }
+    | "\\n" { Buffer.add_char buf '\n'; string lexbuf }
     | _ as c { Buffer.add_char buf c; string lexbuf }
     | eof { raise (Lexing_error ("String without end quote...")) }
 
