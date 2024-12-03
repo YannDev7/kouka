@@ -67,6 +67,8 @@ rule next_tokens = parse
     | "}" { (*pp_lexbuf lexbuf;*) RBRACE }
     | "(" { LPAR }
     | ")" { RPAR }
+    | "[" { LBRACKET }
+    | "]" { RBRACKET }
     | "," { COMMA }
     | ";" { SEMICOLON }
     | ":" { COLON }
@@ -80,12 +82,14 @@ rule next_tokens = parse
     | "%" { MOD }
     | "==" { DEQ }
     | "!=" { NEQ }
+    | "!" { NOT }
     | "<" { LT }
     | "<=" { LEQ }
     | ">" { GT }
     | ">=" { GEQ }
     | "&&" { AND }
     | "||" { OR }
+    | "~" { TILDE }
     | "++" { PPLUS }
     | "=" { ASSIGN }
     | ":=" { UPDATE }

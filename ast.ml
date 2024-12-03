@@ -21,6 +21,7 @@ type atom =
 
 type expr =
   | ECst of atom
+  | EList of expr list
   | ENot of expr
   | ETilde of expr
   | EBinop of binop * expr * expr

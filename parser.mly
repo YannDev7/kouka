@@ -24,12 +24,13 @@
 %token SEMICOLON, COMMA, COLON, DOT
 %token LBRACE, RBRACE
 %token LPAR, RPAR
+%token LBRACKET, RBRACKET
 %token IF, THEN, ELSE, ELIF, FUN, FN, RETURN, ARROW
 %token LT, LEQ, GT, GEQ
 %token VAL, VAR, ASSIGN, UPDATE
 %token ADD, SUB, MUL, DIV, MOD, PPLUS
-%token DEQ, NEQ
-%token AND, OR
+%token DEQ, NEQ, NOT
+%token AND, OR, TILDE
 %token <string> IDENT
 %token <Ast.atom> ATOM
 
@@ -46,6 +47,7 @@
 %nonassoc UPDATE, DEQ, NEQ, LT, LEQ, GT, GEQ
 %left ADD SUB PPLUS
 %left MUL DIV MOD
+%nonassoc TILDE, NOT
 
 /* Point d'entrée de la grammaire */
 %start file
@@ -139,12 +141,14 @@ lt_ident_ls_gt:
 
 (* EXPR BLOCKS STMT *)
 
-%inline expr:
+%inline expr: // magic inline
 | b = block { EBlock b }
 | e = bexpr { e }
 ;
 
 bexpr:
+| TILDE e = bexpr { ETilde e }
+| NOT e = bexpr { ENot e }
 | a = atom { a }
 | e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
 | IF e1 = bexpr THEN e2 = expr ELSE e3 = expr
@@ -152,6 +156,7 @@ bexpr:
     EIf_then_else (e1, e2, e3)
   }
 | IF e1 = bexpr THEN e2 = expr { EIf_then_else (e1, e2, EBlock []) }
+| IF e1 = bexpr RETURN e2 = expr { EIf_then_else (e1, EReturn e2, EBlock []) }
 | RETURN e = expr { EReturn e }
 ;
 
@@ -161,7 +166,22 @@ atom:
 | a = ATOM { ECst a }
 | id = ident { ECst (AVar id) }
 | LPAR RPAR { ECst AUnit }
+| a = atom DOT id = ident { ECall (ECst (AString id), [a]) }
 | a = atom LPAR ls = separated_list(COMMA, expr) RPAR { ECall (a, ls) }
+| LBRACKET ls = separated_list(COMMA, expr) RBRACKET { EList ls }
+| a = atom b = block 
+  { 
+    ECall (
+      a,
+      [
+        EFn {
+          args = [];
+          tag = ([], KUnit);
+          content = EBlock b
+        }
+      ]
+    ) 
+  }
 ;
 
 block:
