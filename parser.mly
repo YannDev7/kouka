@@ -24,7 +24,7 @@
 %token SEMICOLON, COMMA, COLON, DOT
 %token LBRACE, RBRACE
 %token LPAR, RPAR
-%token IF, THEN, ELIF, ELSE, FUN, FN, ARROW
+%token IF, THEN, ELSE, ELIF, FUN, FN, RETURN, ARROW
 %token LT, LEQ, GT, GEQ
 %token VAL, VAR, ASSIGN, UPDATE
 %token ADD, SUB, MUL, DIV, MOD, PPLUS
@@ -36,6 +36,11 @@
 /* max priority down */
 
 // then moins prio que else et elif
+
+%nonassoc RETURN
+%nonassoc THEN
+%nonassoc ELSE
+
 %left OR
 %left AND
 %nonassoc UPDATE, DEQ, NEQ, LT, LEQ, GT, GEQ
@@ -134,7 +139,7 @@ lt_ident_ls_gt:
 
 (* EXPR BLOCKS STMT *)
 
-expr:
+%inline expr:
 | b = block { EBlock b }
 | e = bexpr { e }
 ;
@@ -142,7 +147,12 @@ expr:
 bexpr:
 | a = atom { a }
 | e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
-(*| IF e1 = bexpr then e2 = expr*) 
+| IF e1 = bexpr THEN e2 = expr ELSE e3 = expr
+  { 
+    EIf_then_else (e1, e2, e3)
+  }
+| IF e1 = bexpr THEN e2 = expr { EIf_then_else (e1, e2, EBlock []) }
+| RETURN e = expr { EReturn e }
 ;
 
 (* TODO: handle string in lexer, and other atom rules *)

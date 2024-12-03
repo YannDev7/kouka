@@ -34,8 +34,8 @@
         List.iter (fun (name, token) -> Hashtbl.add kws name token) 
             [
                 ("fun", FUN); ("val", VAL); ("var", VAR); ("if", IF);
-                ("then", THEN); ("elif", ELIF); ("else", ELSE); ("elif", ELIF);
-                ("fn", FN)
+                ("then", THEN); ("elif", ELIF); ("else", ELSE); ("fn", FN);
+                ("return", RETURN)
             ];
         fun s -> try Hashtbl.find kws s with | Not_found -> IDENT s
 }
@@ -128,7 +128,8 @@ and string = parse
         let emit tok =
             (* pp_tok Format.std_formatter tok; *)
             if tok = RBRACE then Queue.push SEMICOLON tokens;
-            Queue.push tok tokens;
+            if tok = ELIF then Queue.push ELSE tokens;
+            Queue.push (if tok = ELIF then IF else tok) tokens;
             last := tok in
         Stack.push 0 ident_st;
 
