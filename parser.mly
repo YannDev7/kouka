@@ -16,6 +16,10 @@
   let is_ok_block ls =
     if not_last_exp ls then raise Block_not_end_expr
     else ()
+
+  let is_not_call = function
+    | ECall (e, ls) -> false
+    | _ -> true
 %}
 
 /* Définitions des priorités et associativités des tokens */
@@ -74,7 +78,7 @@ id = IDENT { id }
 (* MATCHING FUNCTIONS AND ARGS *)
 
 /* TODO: add annot */
-%inline funbody:
+funbody:
 | LPAR fargs = separated_list(COMMA, param) RPAR res_t = annot? fcontent = expr {
     match res_t with
       | None -> { args = fargs; content = fcontent; tag = ([], KUnit) }
@@ -87,7 +91,7 @@ annot:
 ;
 
 /* TODO: COLON type */
-%inline param:
+param:
 | pname = ident COLON typ { pname }
 ;
 
@@ -170,7 +174,8 @@ atom:
 | id = ident { ECst (AVar id) }
 | LPAR e = expr RPAR { e }
 | LPAR RPAR { ECst AUnit }
-| a = atom DOT id = ident { ECall (ECst (AString id), [a]) } (* TODO CHECK E NOT CALL *)
+| a = atom DOT id = ident { if is_not_call a then ECall (ECst (AString id), [a])
+                            else raise Expr_is_a_call } (* TODO CHECK E NOT CALL *)
 | a = atom LPAR ls = separated_list(COMMA, expr) RPAR { ECall (a, ls) }
 | LBRACKET ls = separated_list(COMMA, expr) RBRACKET { EList ls }
 | a = atom b = block 
