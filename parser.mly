@@ -168,6 +168,7 @@ bexpr:
 atom:
 | a = ATOM { ECst a }
 | id = ident { ECst (AVar id) }
+| LPAR e = expr RPAR { e }
 | LPAR RPAR { ECst AUnit }
 | a = atom DOT id = ident { ECall (ECst (AString id), [a]) } (* TODO CHECK E NOT CALL *)
 | a = atom LPAR ls = separated_list(COMMA, expr) RPAR { ECall (a, ls) }
