@@ -12,9 +12,27 @@ let pp_lexbuf lb =
   Format.print_string content;
   Format.print_string "\n]\n"
 
-let pp_atom fmt = function
+let rec pp_list printer fmt = function 
+  | [] -> ()
+  | hd::tl -> fprintf fmt "%a;%a" printer hd (pp_list printer) tl;
+
+let rec pp_atom fmt = function
   | AInt i -> fprintf fmt "%d" i
   | _ -> fprintf fmt "atom "
+and pp_binop fmt = function
+  | Add -> fprintf fmt "+"
+  | _ -> fprintf fmt "binop"
+and pp_expr fmt = function 
+  | ECst a -> fprintf fmt "%a" pp_atom a
+  | EList els -> fprintf fmt "[%a]" (pp_list pp_expr) els
+  | _ -> fprintf fmt "expr"
+and pp_stmt fmt = function 
+  | SExpr e -> fprintf fmt "%a" pp_expr e 
+  | SAssign (id, e) -> fprintf fmt "%s = %a" id pp_expr e
+  | SUpdate (id, e) -> fprintf fmt "%s = %a" id pp_expr e
+and pp_block fmt ls =
+  fprintf fmt "[%a]" (pp_list pp_stmt) ls
+
 
 let pp_tok fmt = function
   | FUN -> fprintf fmt "fun "
