@@ -41,18 +41,24 @@
 /* max priority down */
 
 // then moins prio que else et elif
+// lu le plus prio = "le - prio"
 
 %nonassoc RETURN
 %nonassoc THEN
 %nonassoc ELSE
 
+%nonassoc bexpr_p
+
+%nonassoc ASSIGN
 %left OR
 %left AND
 %nonassoc UPDATE, DEQ, NEQ, LT, LEQ, GT, GEQ
 %left ADD SUB PPLUS
 %left MUL DIV MOD
 %nonassoc TILDE, NOT
-%nonassoc FN
+%nonassoc atom_p
+%nonassoc LPAR
+%nonassoc DOT, FN, LBRACE
 
 /* Point d'entrée de la grammaire */
 %start file
@@ -146,15 +152,17 @@ lt_ident_ls_gt:
 
 (* EXPR BLOCKS STMT *)
 
-%inline expr: // magic inline
+// when in expr, read bexpr first (vs block)
+expr: // magic inline
 | b = block { EBlock b }
-| e = bexpr { e }
+| e = bexpr %prec bexpr_p { e }
 ;
 
+// when in bexpr, read atom first (vs bexpr atom)
 bexpr:
 | TILDE e = bexpr { ETilde e }
 | NOT e = bexpr { ENot e }
-| a = atom { a }
+| a = atom %prec atom_p { a }
 | e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
 | id = ident UPDATE e = bexpr { EAssign (id, e) }
 | IF e1 = bexpr THEN e2 = expr ELSE e3 = expr
@@ -187,7 +195,7 @@ atom:
           content = EBlock b
         }]) 
   }
-| e = expr FN body = funbody { ECall (e, [EFn body]) }
+| e = atom FN body = funbody { ECall (e, [EFn body]) }
 ;
 
 block:
