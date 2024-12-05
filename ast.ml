@@ -25,7 +25,7 @@ type expr =
   | ENot of expr
   | ETilde of expr
   | EBinop of binop * expr * expr
-  | EAssign of ident * expr
+  | EUpdate of ident * expr
   | EReturn of expr
   | EIf_then_else of expr *  expr * expr
   | EBlock of block

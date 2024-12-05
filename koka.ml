@@ -5,6 +5,7 @@ open Lexing
 open Parser
 open Lexer
 open Exception
+open Pp
 
 let usage = "usage: koka [options] file.koka"
 
@@ -38,6 +39,7 @@ let () =
     close_in c;
     if !parse_only then exit 0;
     (*Interp.file f*)
+    pp_file Format.std_formatter _f;
   with
     | Lexer.Lexing_error s ->
 	report (lexeme_start_p lb, lexeme_end_p lb);

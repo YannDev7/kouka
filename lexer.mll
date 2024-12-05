@@ -199,6 +199,6 @@ and string = parse
             end;
 
             let ans = Queue.pop tokens in
-            pp_tok Format.std_formatter ans;
+            (*pp_tok Format.std_formatter ans;*)
             ans
 }

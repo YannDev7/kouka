@@ -164,7 +164,7 @@ bexpr:
 | NOT e = bexpr { ENot e }
 | a = atom %prec atom_p { a }
 | e1 = bexpr op = binop e2 = bexpr { EBinop (op, e1, e2) }
-| id = ident UPDATE e = bexpr { EAssign (id, e) }
+| id = ident UPDATE e = bexpr { EUpdate (id, e) }
 | IF e1 = bexpr THEN e2 = expr ELSE e3 = expr
   { 
     EIf_then_else (e1, e2, e3)
