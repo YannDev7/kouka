@@ -25,7 +25,7 @@ type _tconst =
   | TCString of string
   | TCVar of ident
 and tconst = {
-  const: _tconst;
+  tconst: _tconst;
   typ: typ
 }
 
@@ -42,7 +42,7 @@ and _texpr =
   | TEFn of funbody
   | TECall of texpr * texpr list 
 and texpr = {
-  expr: _texpr;
+  texpr: _texpr;
   typ: typ
 }
 
@@ -51,32 +51,32 @@ and _tstmt =
   | TSAssign of ident * texpr
   | TSUpdate of ident * texpr
 and tstmt = {
-  stmt: _tstmt;
+  tstmt: _tstmt;
   typ: typ
 }
 
 and _tblock = tstmt list
 and tblock = {
-  block: _tblock;
+  tblock: _tblock;
   typ: typ
 }
 
 and _tfunbody = {
   args: ident list;
   (*tag: tresult; a tej ?*)
-  content: texpr
+  tcontent: texpr
 }
 and tfunbody = {
-  body: _tfunbody;
+  tbody: _tfunbody;
   typ: typ
 }
 
 and _tdecl = {
-  name: ident;
-  body: tfunbody
+  tbody: tfunbody;
+  name: ident
 }
 and tdecl = {
-  decl: _tdecl;
+  tdecl: _tdecl;
   typ: typ
 }
 

@@ -42,7 +42,7 @@ let () =
     (*Interp.file f*)
     pp_file Format.std_formatter _f;
 
-    (*Typing.type_file _f;*)
+    let tast = Typing.type_file _f in ()
   with
     | Lexer.Lexing_error s ->
 	report (lexeme_start_p lb, lexeme_end_p lb);
