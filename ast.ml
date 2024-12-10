@@ -12,15 +12,19 @@ type binop =
   | Pplus
 (* TODO: add more *)
 
-type atom =
-  | AUnit
-  | ABool of bool
-  | AInt of int
-  | AString of string
-  | AVar of ident
+type _const =
+  | CUnit
+  | CBool of bool
+  | CInt of int
+  | CString of string
+  | CVar of ident
+and const = {
+  const: _const;
+  pos: pos 
+}
 
-type expr =
-  | ECst of atom
+type _expr =
+  | ECst of const
   | EList of expr list
   | ENot of expr
   | ETilde of expr
@@ -31,31 +35,59 @@ type expr =
   | EBlock of block
   | EFn of funbody
   | ECall of expr * expr list
+and expr = {
+  expr: _expr;
+  pos: pos
+}
 
-and stmt =
+and _stmt =
   | SExpr of expr
   | SAssign of ident * expr
   | SUpdate of ident * expr
+and stmt = {
+  stmt: _stmt;
+  pos: pos
+}
 
-and block = stmt list
+and _block = stmt list
+and block = {
+  block: _block;
+  pos: pos
+}
 
-and kwutype =
+and _kwutype =
   | KUnit
   | KType of ident * kwutype (* TODO: list or not list ? *)
   | KProd of kwutype * kwutype
   | KFun of kwutype list * result
+and kwutype = {
+  kwutype: _kwutype;
+  pos: pos
+}
 
-and result = ident list * kwutype
+and _result = ident list * kwutype
+and result = {
+  result: _result;
+  pos: pos
+}
 
-and funbody = {
+and _funbody = {
   args: ident list;
   tag: result;
   content: expr
 }
+and funbody = {
+  funbody: _funbody;
+  pos: pos
+}
 
-and decl = {
+and _decl = {
   name: ident;
   body: funbody
+}
+and decl = {
+  decl: _decl;
+  pos: pos
 }
 
 and file = decl list

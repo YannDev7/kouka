@@ -93,21 +93,21 @@ rule next_tokens = parse
     | "++" { PPLUS }
     | "=" { ASSIGN }
     | ":=" { UPDATE }
-    | "True" { ATOM (ABool true) }
-    | "False" { ATOM (ABool false) }
+    | "True" { CONST ({ const = (CBool true); pos = (lexeme_start_p lexbuf, lexeme_end_p lexbuf) }) }
+    | "False" { CONST ({ const = CBool false; pos = (lexeme_start_p lexbuf, lexeme_end_p lexbuf) }) }
     | "\"" { Buffer.clear buf; string lexbuf }
     | ident as id { if not (valid_ident id) then raise (Lexing_error "Invalid ident name");
                     (*pp_lexbuf lexbuf;*) kwd_or_id id }
     | "-"integer as s (* TODO: fix spaghetti code *)
         {
             (*pp_lexbuf lexbuf;*)
-            try ATOM (AInt (-(int_of_string s)))
+            try CONST ({ const = CInt (-(int_of_string s)); pos = (lexeme_start_p lexbuf, lexeme_end_p lexbuf) } )
             with _ -> raise (Lexing_error ("Constant too large: " ^ s))
         }
     | integer as s 
         {
             (*pp_lexbuf lexbuf;*)
-            try ATOM (AInt (int_of_string s))
+            try CONST ({ const = CInt (int_of_string s); pos = (lexeme_start_p lexbuf, lexeme_end_p lexbuf) } )
             with _ -> raise (Lexing_error ("Constant too large: " ^ s))
         }
     | eof { EOF }
@@ -117,7 +117,7 @@ and comment = parse
     | _ { c := col_num lexbuf; comment lexbuf }
     | eof { raise (Lexing_error ("Comment without end...")) }
 and string = parse
-    | '"' { ATOM (AString (Buffer.contents buf)) }
+    | '"' { CONST ({ const = CString (Buffer.contents buf); pos = (lexeme_start_p lexbuf, lexeme_end_p lexbuf) } ) }
     | "\\\\" { Buffer.add_char buf '\\'; string lexbuf }
     | "\\\"" { Buffer.add_char buf '\\'; Buffer.add_char buf '"'; string lexbuf }
     | "\\t" { Buffer.add_char buf '\t'; string lexbuf }
@@ -153,7 +153,7 @@ and string = parse
                 c := col_num lb; (* Important! to make sure the column corresponds
                                     to the beginning of the token *)
                 let tok = next_tokens lb in
-                (*pp_tok Format.std_formatter (ATOM (AInt !c));
+                (*pp_tok Format.std_formatter (CONST (AInt !c));
                 pp_tok Format.std_formatter tok;*)
                 tok in
 
@@ -187,9 +187,9 @@ and string = parse
                             if !c > Stack.top ident_st then raise (Lexing_error "Indentation error");
 
                             if not (end_of_cont !last) && not (beg_of_cont next) then
-                                (*pp_tok Format.std_formatter (ATOM (AInt !c));
+                                (*pp_tok Format.std_formatter (CONST (AInt !c));
                                 pp_tok Format.std_formatter !last;
-                                pp_tok Format.std_formatter (ATOM (AInt !c));
+                                pp_tok Format.std_formatter (CONST (AInt !c));
                                 pp_tok Format.std_formatter next;*)
                                 emit SEMICOLON;
                             emit next;

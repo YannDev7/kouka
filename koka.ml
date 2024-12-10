@@ -6,6 +6,7 @@ open Parser
 open Lexer
 open Exception
 open Pp
+open Typing
 
 let usage = "usage: koka [options] file.koka"
 
@@ -40,6 +41,8 @@ let () =
     if !parse_only then exit 0;
     (*Interp.file f*)
     pp_file Format.std_formatter _f;
+
+    (*Typing.type_file _f;*)
   with
     | Lexer.Lexing_error s ->
 	report (lexeme_start_p lb, lexeme_end_p lb);
@@ -53,6 +56,9 @@ let () =
   report (lexeme_start_p lb, lexeme_end_p lb);
   eprintf "syntax error, block not ending with expr@.";
   exit 1
+    | Typing.Error (pos, s) ->
+  report pos;
+  eprintf "typing error, %s@." s;
     | e ->
 	eprintf "Anomaly: %s\n@." (Printexc.to_string e);
 	exit 2
