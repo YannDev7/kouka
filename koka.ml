@@ -11,10 +11,12 @@ open Typing
 let usage = "usage: koka [options] file.koka"
 
 let parse_only = ref false
+let type_only = ref false
 
 let spec =
   [
     "--parse-only", Arg.Set parse_only, "  stop after parsing";
+    "--type-only", Arg.Set type_only, "  stop after typing"
   ]
 let file =
   let file = ref None in
@@ -42,7 +44,9 @@ let () =
     (*Interp.file f*)
     pp_file Format.std_formatter _f;
 
-    let tast = Typing.type_file _f in ()
+    ignore(let tast = Typing.type_file _f in ());
+
+    if !type_only then exit 0;
   with
     | Lexer.Lexing_error s ->
 	report (lexeme_start_p lb, lexeme_end_p lb);
@@ -59,6 +63,7 @@ let () =
     | Typing.Error (pos, s) ->
   report pos;
   eprintf "typing error, %s@." s;
+  exit 1
     | e ->
 	eprintf "Anomaly: %s\n@." (Printexc.to_string e);
 	exit 2
