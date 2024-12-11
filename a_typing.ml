@@ -1,5 +1,5 @@
 (* typage avec algorithme W (cf TD6) *)
-
+(*
 type typc =
   | Tint
   | Tarrow of typ * typ
@@ -7,6 +7,16 @@ type typc =
 and typ =
   | Te of typc
   | Tvar of tvar
+and tvar =
+  { id : int;
+    mutable def : typ option }*)
+
+    type typ =
+  | Tint
+  | Tarrow of typ * typ
+  | Tproduct of typ * typ
+  | Tvar of tvar
+
 and tvar =
   { id : int;
     mutable def : typ option }
@@ -171,14 +181,14 @@ let find ident env =
     fun fv -> fresh_vars := Vmap.add fv (V.create ()) !fresh_vars
   ) (upd_fvars t.vars);
 
-  let rec clean t = match head t with
-    | Tvar tv ->
-      if Vmap.mem tv !fresh_vars then Tvar (Vmap.find tv !fresh_vars)
-      else Tvar tv
-    | Tint -> Tint
-    | Tarrow (ta, tr) -> Tarrow (clean ta, clean tr)
-    | Tproduct (ta, tb) -> Tproduct (clean ta, clean tb)
-  in clean t.typ
+let rec clean t = match head t with
+  | Tvar tv ->
+    if Vmap.mem tv !fresh_vars then Tvar (Vmap.find tv !fresh_vars)
+    else Tvar tv
+  | Tint -> Tint
+  | Tarrow (ta, tr) -> Tarrow (clean ta, clean tr)
+  | Tproduct (ta, tb) -> Tproduct (clean ta, clean tb)
+in clean t.typ
 
 type expression =
   | Var of string
