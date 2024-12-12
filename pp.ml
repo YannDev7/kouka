@@ -33,7 +33,7 @@ and pp_expr fmt exp = match exp.expr with
   | EBlock b -> fprintf fmt "%a" pp_block b
   | EUpdate (id, e) -> fprintf fmt "%s := %a" id pp_expr e
   | EReturn e -> fprintf fmt "return %a\n" pp_expr e
-  | EIf_then_else (e1, e2, e3) -> fprintf fmt "if (%a) then \n\t%a\n else \n\t %a" pp_expr e1 pp_expr e2 pp_expr e2
+  | EIf_then_else (e1, e2, e3) -> fprintf fmt "if (%a) then \n\t%a\n else \n\t %a" pp_expr e1 pp_expr e2 pp_expr e3
   | EFn body -> fprintf fmt "fn %a" pp_funbody body
   | ECall (e, ls) -> fprintf fmt "%a (%a)\n" pp_expr e (pp_list pp_expr) ls
   | _ -> fprintf fmt "expr"

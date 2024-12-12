@@ -143,8 +143,9 @@ and string = parse
             (* pp_tok Format.std_formatter tok; *)
             if tok = RBRACE then Queue.push SEMICOLON tokens;
             if tok = ELIF then Queue.push ELSE tokens;
-            Queue.push (if tok = ELIF then IF else tok) tokens;
-            last := tok in
+            let to_push = if tok = ELIF then IF else tok in
+            Queue.push to_push tokens;
+            last := to_push in
         Stack.push 0 ident_st;
 
         fun lb ->
