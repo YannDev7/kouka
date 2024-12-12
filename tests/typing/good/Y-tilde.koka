@@ -1,0 +1,10 @@
+fun main() {
+  val x = 2;
+  val y = 2;
+
+  if ~(x + y) == 0 then {
+    42
+  } else {
+    x + y
+  }
+}

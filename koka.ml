@@ -40,9 +40,9 @@ let () =
   try
     let _f = Parser.file Lexer.next_token lb in
     close_in c;
+    pp_file Format.std_formatter _f;
     if !parse_only then exit 0;
     (*Interp.file f*)
-    pp_file Format.std_formatter _f;
 
     ignore(let tast = Typing.type_file _f in ());
 

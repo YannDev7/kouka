@@ -1,0 +1,6 @@
+fun main() {
+  if True then
+    42
+  else
+    7
+}
