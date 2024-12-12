@@ -142,6 +142,24 @@ and type_binop pos op te1 te2 = match op with
         { texpr = TEBinop (op, te1, te2);
           typ = (TBool, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
     end
+  | Pplus ->
+    begin
+      ignore(te1.texpr); ignore(te2.texpr);
+      unify pos te1.typ te2.typ;
+
+      if (head_typ te1.typ) <> (head_typ te2.typ) then
+        (* theorically, should be checked by unify *)
+        raise (Error (pos, "++ require same type on both sides."));
+
+      match head_typ te1.typ with
+        | TString ->
+          { texpr = TEBinop (op, te1, te2);
+          typ = (TString, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
+        | TList t ->
+          { texpr = TEBinop (op, te1, te2);
+          typ = (TList t, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
+        | _ -> raise (Error (pos, "++ only supports list and strings."));
+    end 
   | _ -> failwith "non impl binop\n";
 
 and type_expr env exp = match exp.expr with

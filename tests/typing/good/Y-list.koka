@@ -2,5 +2,7 @@ fun main() {
     val z = 8;
     val y = z;
     var x := [12, 42, 7, y];
+    var y := [42];
+    x := x ++ y;
     2
 }
