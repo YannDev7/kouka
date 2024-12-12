@@ -1,0 +1,6 @@
+fun main() {
+    val z = 8;
+    val y = z;
+    var x := [12, 42, 7, y];
+    2
+}

@@ -194,6 +194,22 @@ and type_expr env exp = match exp.expr with
     { texpr = TEIf_then_else (te1, te2, te3);
       typ = union_teff (union_teff te1.typ te2.typ)
                         te3.typ }
+  | EList ls ->
+    if ls = [] then { texpr = TEList []; typ = no_eff (TVar (V.create ())) }
+    else begin
+      let tls = List.map (fun ei -> type_expr env ei) ls in
+      if not (List.for_all 
+                (fun tei -> ignore(tei.texpr); (* ocaml magic... *)
+                            head_typ tei.typ = head_typ (List.hd tls).typ)
+                tls) then
+        raise (Error (exp.pos, "list elements must have the same type"));
+
+      let eff = List.fold_left
+                  (fun cur_eff tei -> ignore(tei.texpr);
+                                      union_eff cur_eff (head_eff tei.typ))
+                  (false, false) tls in
+      { texpr = TEList tls; typ = (TList (head_typ (List.hd tls).typ), eff) }
+    end
   | ECall (e, args) ->
     let pre_def = ["println"] in
     begin

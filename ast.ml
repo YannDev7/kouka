@@ -25,7 +25,7 @@ and const = {
 
 type _expr =
   | ECst of const
-  | EList of expr list
+  | EList of expr list (* not in const, kinda sus but yeah *)
   | ENot of expr
   | ETilde of expr
   | EBinop of binop * expr * expr
