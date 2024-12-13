@@ -5,73 +5,82 @@ exception Error of pos * string
 
 module Idmap = Map.Make(String)
 
+(* todo: check if function is defined before calling *)
+
 type env = {
   types: typ Idmap.t;
   vars: bool Idmap.t
 }
 
-module V = struct
-  type t = tvar
-  let compare v1 v2 = Stdlib.compare v1.id v2.id
-  let equal v1 v2 = v1.id = v2.id
-  let create = let r = ref 0 in fun () -> incr r; { id = !r; def = None }
-end
-
 let rec head = function
   | TVar { def = Some t }, eff -> head t
   | t -> t
 
+let rec cannon tb = match head tb with
+  | TVar t, eff -> (TVar t, eff)
+  | TUnit, eff | TInt, eff | TBool, eff | TString, eff -> tb
+  | TList t, eff -> (TList (cannon t), eff)
+  | TFun (args, ret), eff ->
+    (* be careful of args order *)
+    (TFun (
+      List.rev (List.fold_left (fun acc a -> cannon a::acc) args []),
+      cannon ret
+    ), eff)
+  | TMaybe t, eff -> (TMaybe (cannon t), eff)
+
 let head_typ t = fst (head t)
 let head_eff t = snd (head t)
 
-let no_eff tv = (tv, (false, false))
+let no_eff tv = (tv, Eset (Effset.empty))
 
-let union_eff ef1 ef2 =
-  (
-    ((fst ef1) || (fst ef2)), 
-    ((snd ef1) || (snd ef2))
-  )
+let fresh_eff tv = (tv, TEff (VEff.create ()))
 
-let union_teff t1 t2 =
-  (head_typ t2, union_eff (head_eff t1) (head_eff t2))
+let union_eff t1 t2 = EUnion (head_eff t1, head_eff t2)
 
 let add_to_env env id t = Idmap.add id t env
 
-let rec occur v t = match head_typ t with
+let rec occur v tb = match head_typ tb with
   | TVar tv -> tv.id = v.id (* no rec because tv.def is None; we can use V.equal *)
   | TUnit | TInt | TBool | TString -> false 
-  | TList t -> occur v (no_eff t)
+  | TList t -> occur v t
   | TFun (args, ret) ->
-      List.fold_left (fun any a -> any || occur v (no_eff a)) false args
+      List.fold_left (fun any a -> any || occur v a) false args
     ||occur v ret
-  | TMaybe t -> occur v (no_eff t)
+  | TMaybe t -> occur v t
+
+let constraints = ref []
 
 let rec unify pos t1 t2 = match head t1, head t2 with
-  | (TVar tv1, e1) , (TVar tv2, e2) when tv1.id = tv2.id ->
-    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));
+  | (TVar tv1, e1), (TVar tv2, e2) when tv1.id = tv2.id ->
+    unify_eff pos e1 e2
   | (TVar tv1, e1), (t2, e2) -> 
     if occur tv1 (t2, e2) then raise (Error (pos, "unify: cycle"));
+    unify_eff pos e1 e2;
     tv1.def <- Some (t2, e2)
   | (t1, e1), (TVar tv2, e2) -> 
     if occur tv2 (t1, e1) then raise (Error (pos, "unify: cycle"));
+    unify_eff pos e1 e2;
     tv2.def <- Some (t1, e1)
   | (t1, e1), (t2, e2) when t1 = t2 ->
-    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));
+    unify_eff pos e1 e2;
+    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); (* x doubt *)
   | (TList t1, e1), (TList t2, e2) ->
-    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));
-    unify pos (no_eff t1) (no_eff t2);
+    unify_eff pos e1 e2;
+    unify pos t1 t2;
+    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); (* x doubt *)
   | (TFun (args1, res1), e1), (TFun (args2, res2), e2) ->
-    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));
-    List.iter (fun (a1, a2) -> unify pos (no_eff a1) (no_eff a2)) 
+    List.iter (fun (a1, a2) -> unify pos a1 a2) 
               (List.combine args1 args2);
-    unify pos res1 res2
+    unify_eff pos e1 e2;
+    unify pos res1 res2;
+    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); (* x doubt *)
   | (TMaybe t1, e1), (TMaybe t2, e2) ->
     if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));
-    unify pos (no_eff t1) (no_eff t2)
+    unify pos t1 t2
   | _, _ -> raise (Error (pos, "unify: error"))
 
-let unify_no_eff pos t1 t2 =
-  unify pos (no_eff (fst t1)) (no_eff (fst t2))
+and unify_eff pos e1 e2 =
+  ()
 
 let get_call_id e = match e.expr with
   | ECst cst ->
@@ -101,64 +110,66 @@ and type_binop pos op te1 te2 = match op with
       (* theorically useless, but why not *)
       unify pos te1.typ te2.typ;
 
-      if (head_typ te1.typ) <> TInt || (head_typ te2.typ) <> TInt then begin
-        raise (Error (pos, "+-*/% require int on both sides."))
-      end else { texpr = TEBinop (op, te1, te2);
-                typ = union_teff te1.typ te2.typ}
+      constraints := ([TInt], te1.typ, Error (pos, "+-*/% require int on both sides."))
+                      ::!constraints;
+      constraints := ([TInt], te2.typ, Error (pos, "+-*/% require int on both sides."))
+                      ::!constraints;
+      { texpr = TEBinop (op, te1, te2);
+        typ = (TInt, union_eff te1.typ te2.typ) }
     end
   | Lt | Leq | Gt | Geq ->
     begin
       ignore(te1.texpr); ignore(te2.texpr);
       unify pos te1.typ te2.typ;
-
-      if (head_typ te1.typ) <> TInt || (head_typ te2.typ) <> TInt then begin
-        raise (Error (pos, "< <= > >= require int on both sides."))
-      end else 
-        { texpr = TEBinop (op, te1, te2);
-          typ = (TBool, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
+      
+      constraints := ([TInt], te1.typ, Error (pos, "< <= > >= require int on both sides."))
+                      ::!constraints;
+      constraints := ([TInt], te2.typ, Error (pos, "< <= > >= require int on both sides."))
+                      ::!constraints;
+      { texpr = TEBinop (op, te1, te2);
+        typ = (TBool, union_eff te1.typ te2.typ) }
     end
   | Eq | Neq ->
     begin
       ignore(te1.texpr); ignore(te2.texpr);
       unify pos te1.typ te2.typ;
 
-      if (head_typ te1.typ) <> (head_typ te2.typ) then
-        (* theorically, should be checked by unify *)
-        raise (Error (pos, "!= == require same type on both sides."))
-      else if not (List.mem (head_typ te1.typ) [TInt; TBool; TString]) then
-        raise (Error (pos, "!= == require the type to be int, bool or string"))
-      else 
-        { texpr = TEBinop (op, te1, te2);
-          typ = (TBool, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
+      constraints := ([TInt; TBool; TString], te1.typ, Error (pos, "!= == require the type to be int, bool or string"))
+                      ::!constraints;
+      constraints := ([TInt; TBool; TString], te2.typ, Error (pos, "!= == require the type to be int, bool or string"))
+                      ::!constraints;
+     
+      { texpr = TEBinop (op, te1, te2);
+        typ = (TBool, union_eff te1.typ te2.typ) }
     end 
   | And | Or -> 
     begin
       ignore(te1.texpr); ignore(te2.texpr);
       unify pos te1.typ te2.typ;
 
-      if (head_typ te1.typ) <> TBool || (head_typ te2.typ) <> TBool then begin
-        raise (Error (pos, "&& || require bool on both sides."))
-      end else
-        { texpr = TEBinop (op, te1, te2);
-          typ = (TBool, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
+      constraints := ([TBool], te1.typ, Error (pos, "&& || require bool on both sides."))
+                      ::!constraints;
+      constraints := ([TBool], te2.typ, Error (pos, "&& || require bool on both sides."))
+                      ::!constraints;
+
+      { texpr = TEBinop (op, te1, te2);
+        typ = (TBool, union_eff te1.typ te2.typ) }
     end
   | Pplus ->
     begin
       ignore(te1.texpr); ignore(te2.texpr);
       unify pos te1.typ te2.typ;
+      
+      constraints := ([TString, TList TUnit], te1.typ, Error (pos, "++ only supports list and strings."))
+                      ::!constraints;
+      constraints := ([TString, TList TUnit], te2.typ, Error (pos, "++ only supports list and strings."))
+                      ::!constraints;
 
-      if (head_typ te1.typ) <> (head_typ te2.typ) then
-        (* theorically, should be checked by unify *)
-        raise (Error (pos, "++ require same type on both sides."));
+      let t = ((TVar (V.create ())), union_eff te1.typ te2.typ) in
+      unify t te1.typ;
 
-      match head_typ te1.typ with
-        | TString ->
-          { texpr = TEBinop (op, te1, te2);
-          typ = (TString, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
-        | TList t ->
-          { texpr = TEBinop (op, te1, te2);
-          typ = (TList t, union_eff (head_eff te1.typ) (head_eff te2.typ)) }
-        | _ -> raise (Error (pos, "++ only supports list and strings."));
+      { texpr = TEBinop (op, te1, te2);
+          typ = t }
     end 
   | _ -> failwith "non impl binop\n";
 
@@ -171,13 +182,13 @@ and type_expr env exp = match exp.expr with
     { texpr = TEBlock tb; typ = tb.typ }
   | ENot e ->
     let te = type_expr env e in
-    if head_typ te.typ <> TBool then
-        raise (Error (exp.pos, "! require bool."));
+    constraints := ([TBool], te.typ, Error (pos, "! requires bool."))
+                   ::!constraints;
     { texpr = TENot te; typ = te.typ }
   | ETilde e ->
     let te = type_expr env e in
-    if head_typ te.typ <> TInt then
-        raise (Error (exp.pos, "~ require int."));
+    constraints := ([TInt], te.typ, Error (pos, "~ requires int."))
+                   ::!constraints;
     { texpr = TETilde te; typ = te.typ }
   | EBinop (op, e1, e2) ->
     let te1 = type_expr env e1 in
@@ -199,33 +210,33 @@ and type_expr env exp = match exp.expr with
     { texpr = TEUpdate (id, te); typ = te.typ }
   | EReturn e ->
     let te = type_expr env e in
-    { texpr = TEReturn te; typ = te.typ }
+    { texpr = TEReturn te;
+      typ = fresh_eff (TVar (V.create ())) } (* todo: in the end, unify
+                                                      with types of all the return *)
   | EIf_then_else (e1, e2, e3) ->
     let te1 = type_expr env e1 in
     let te2 = type_expr env e2 in
     let te3 = type_expr env e3 in
-    
-    if head_typ te1.typ <> TBool then
-      raise (Error (exp.pos, "condition doesn't evaluate to boolean."));
+
+    constraints := ([TBool], te.typ, Error (pos, "condition doesn't evaluate to boolean."))
+                   ::!constraints;
 
     unify_no_eff exp.pos te2.typ te3.typ;
     { texpr = TEIf_then_else (te1, te2, te3);
-      typ = union_teff (union_teff te1.typ te2.typ)
+      typ = union_eff (union_eff te1.typ te2.typ)
                         te3.typ }
   | EList ls ->
-    if ls = [] then { texpr = TEList []; typ = no_eff (TVar (V.create ())) }
+    if ls = [] then { texpr = TEList []; typ = fresh_eff (TVar (V.create ())) }
     else begin
       let tls = List.map (fun ei -> type_expr env ei) ls in
-      if not (List.for_all 
-                (fun tei -> ignore(tei.texpr); (* ocaml magic... *)
-                            head_typ tei.typ = head_typ (List.hd tls).typ)
-                tls) then
-        raise (Error (exp.pos, "list elements must have the same type"));
+      List.iter ((fun tei -> ignore(tei.texpr); (* ocaml magic... *)
+                             unify tei.typ (List.hd tls).typ)
+                tls);
 
       let eff = List.fold_left
                   (fun cur_eff tei -> ignore(tei.texpr);
                                       union_eff cur_eff (head_eff tei.typ))
-                  (false, false) tls in
+                  (head_eff (List.hd tls)) tls in
       { texpr = TEList tls; typ = (TList (head_typ (List.hd tls).typ), eff) }
     end
   | ECall (e, args) ->
@@ -235,7 +246,7 @@ and type_expr env exp = match exp.expr with
         | Some id when List.mem id pre_def ->
           begin
             match id with
-              | "println" ->
+              (*| "println" ->
                 if List.length args <> 1 then
                   raise (Error (exp.pos, "println requires exactly one argument."));
 
@@ -252,7 +263,7 @@ and type_expr env exp = match exp.expr with
                             };
                             typ = (TUnit, (false, true))
                           }, [te]);
-                  typ = (TUnit, union_eff (snd te.typ) (false, true)) }
+                  typ = (TUnit, union_eff (snd te.typ) (false, true)) }*)
               | _ -> failwith "todo\n"
           end
         | _ -> failwith "todo\n";
@@ -272,7 +283,7 @@ and type_block env bl =
       let st = type_stmt env hd in
       let tb = aux tl in
       (* type of block is the type of the last stmt *)
-      {tblock = st::tb.tblock; typ = union_teff st.typ tb.typ }
+      {tblock = st::tb.tblock; typ = union_eff st.typ tb.typ }
   in aux bl
 
 (* note: this is essentially the base case of type_block.
@@ -304,12 +315,16 @@ and type_body env b =
 and type_decl env d =
   let d = d.decl in
   let body = d.body in
-  let tb = type_body env body in
-  { tdecl = { name = d.name; tbody = tb }; typ = tb.typ }
-
-and type_file =
-  let env = ref { types = Idmap.empty; vars = Idmap.empty} in
-  let rec aux = function
-    | [] -> []
-    | hd::tl -> type_decl !env hd::aux tl
-  in aux
+  let tb = type_body env body inTBool in
+  List.iter (
+    fun (cons, t, err) ->
+      begin
+        match head_typ t with
+          | TList tau ->
+            if not (List.mem (TList TUnit) cons) then
+              raise err;
+          | ty ->
+            if not (List.mem (head_typ t) cons) then
+              raise err;
+      end
+  ) !constraints

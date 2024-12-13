@@ -1,22 +1,48 @@
 open Ast
 
           (*  div    cons  *)
-type effect = bool * bool
+type effect =
+  | Div
+  | Console
+
+module Effset = Set.Make(struct type t = effect let compare = compare end)
 
 type typ_val =
   | TUnit
   | TBool
   | TInt
   | TString
-  | TList of typ_val
-  | TFun of typ_val list * typ
-  | TMaybe of typ_val
+  | TList of typ
+  | TFun of typ list * typ
+  | TMaybe of typ
   | TVar of tvar
 and tvar = {
   id: int;
-  mutable def: typ option 
+  mutable def: typ option;
 }
-and typ = typ_val * effect
+and effects =
+  | Eset of Effset.t
+  | EUnion of effects * effects
+  | TEff of teff
+and teff = {
+  eid: int;
+  mutable edef: teff option
+}
+and typ = typ_val * effects
+
+module V = struct
+  type t = tvar
+  let compare v1 v2 = Stdlib.compare v1.id v2.id
+  let equal v1 v2 = v1.id = v2.id
+  let create = let r = ref 0 in fun () -> incr r; { id = !r; def = None }
+end
+
+module VEff = struct
+  type t = tvar
+  let compare v1 v2 = Stdlib.compare v1.id v2.id
+  let equal v1 v2 = v1.id = v2.id
+  let create = let r = ref 0 in fun () -> incr r; { eid = !r; edef = None }
+end
 
 type _tconst =
   | TCUnit
