@@ -50,9 +50,11 @@ and pp_type fmt t = match t.kwutype with
   | _ -> fprintf fmt "typ"
 and pp_result fmt res = match res.result with
   | ls, t -> fprintf fmt "<%a> %a" (pp_list pp_string) ls pp_type t
+and pp_arg fmt (id, t) =
+  fprintf fmt "(%a): %a" pp_string id pp_type t
 and pp_funbody fmt body = 
   let body = body.funbody in
-  fprintf fmt "(%a) %a %a\n" (pp_list pp_string) body.args pp_result body.tag pp_expr body.content 
+  fprintf fmt "(%a) %a %a\n" (pp_list pp_arg) body.args pp_result body.tag pp_expr body.content 
 and pp_decl fmt f =
   let f = f.decl in
   fprintf fmt "fun %s %a\n" f.name pp_funbody f.body

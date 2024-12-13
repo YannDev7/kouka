@@ -102,7 +102,7 @@ annot:
 
 /* TODO: COLON type */
 param:
-| pname = ident COLON typ { pname }
+| pname = ident COLON t = typ { (pname, t) } (* do not forget arg type.. *)
 ;
 
 

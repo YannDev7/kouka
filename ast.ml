@@ -72,7 +72,7 @@ and result = {
 }
 
 and _funbody = {
-  args: ident list;
+  args: (ident * kwutype) list;
   tag: result;
   content: expr
 }
