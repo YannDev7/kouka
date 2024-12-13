@@ -47,6 +47,7 @@ and pp_block fmt b =
 and pp_type fmt t = match t.kwutype with
   | KUnit -> fprintf fmt "()"
   | KProd (t1, t2) -> fprintf fmt "(%a) * (%a)" pp_type t1 pp_type t2
+  | KType (id, kt) -> fprintf fmt "%s <%a>" id pp_type kt
   | _ -> fprintf fmt "typ"
 and pp_result fmt res = match res.result with
   | ls, t -> fprintf fmt "<%a> %a" (pp_list pp_string) ls pp_type t

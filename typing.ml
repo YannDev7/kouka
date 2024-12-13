@@ -30,8 +30,10 @@ let rec cannon tb = match head tb with
   | TMaybe t, eff -> (TMaybe (cannon t), eff)
 
 let head_typ t = fst (head t)
-let head_eff t = snd (head t) (* todo: to update after 
-                                  having added teff *)
+let head_eff t = 
+  snd t
+  (* snd (head t) *) (* todo: to update after 
+                              having added teff *)
 
 let no_eff tv = (tv, ESet (Effset.empty))
 let singleton_eff e = ESet (Effset.singleton e)
@@ -83,10 +85,6 @@ let rec occur v tb = match head_typ tb with
       List.fold_left (fun any a -> any || occur v a) false args
     ||occur v ret
   | TMaybe t -> occur v t
-
-let constraints = ref []
-let cur_id = ref ""
-let divg = ref Idmap.empty
 
 let rec unify pos t1 t2 = match head t1, head t2 with
   | (TVar tv1, e1), (TVar tv2, e2) when tv1.id = tv2.id -> ()
@@ -158,6 +156,11 @@ let rec kwutype_to_typ t = match t.kwutype with
     let teff = eff_from_str eff in
     (TFun (t_args, tres), teff)
 
+let constraints = ref []
+let cur_id = ref ""
+let cur_res = ref (no_eff TUnit)
+let divg = ref Idmap.empty
+let defs = ref Idmap.empty
 
 (* TODO: distinguish val and var *)
 let rec type_const env const = match const.const with
@@ -278,8 +281,10 @@ and type_expr env exp = match exp.expr with
     { texpr = TEUpdate (id, te); typ = te.typ }
   | EReturn e ->
     let te = type_expr env e in
+    (* do we unify the return values too ? *)
+    unify exp.pos !cur_res te.typ;
     { texpr = TEReturn te;
-      typ = fresh_eff (TVar (V.create ())) } (* todo: in the end, unify
+      typ = (TVar (V.create ())), snd te.typ } (* todo: in the end, unify
                                                       with types of all the return *)
   | EIf_then_else (e1, e2, e3) ->
     let te1 = type_expr env e1 in
@@ -368,7 +373,7 @@ and type_expr env exp = match exp.expr with
                               };
                               typ = ft;
                             }, t_args);
-                    typ = (fst ft, union_eff_e uef 
+                    typ = (fst res, union_eff_e uef 
                                               (union_eff_e (head_eff res) eff)) }
               | _ -> raise (Error (exp.pos, id ^ " is not a function."))
             end
@@ -417,11 +422,10 @@ and type_stmt env st = match st.stmt with
 
 and type_body env ob =
   (* TODO: generalise with type of args,
-  check ident of args etc *)
+  check ident of args etc DONE *)
   let b = ob.funbody in
-  (* todo: check div and check return
-           check infered effects included in eff *)
-  
+  (* todo: check div and check return DONE
+           check infered effects included in eff DONE *)
   let te = type_expr env b.content in
   { tbody = { args = List.map (fun (a, b) -> a) b.args;
               tcontent = te }; typ = te.typ}
@@ -432,6 +436,15 @@ and type_decl env od =
   let b = body.funbody in
   cur_id := d.name;
   Printf.printf "adding %s\n" d.name;
+
+  if Idmap.mem d.name !defs then
+    raise (Error (od.pos, "function " ^ d.name ^ " is defined more
+                           than once."));
+
+  if d.name = "main" && b.args <> [] then
+    raise (Error (od.pos, "main function shouldn't have any arguments."));
+
+  defs := Idmap.add d.name true !defs;
 
   (* add args types to env *)
   let n_env, rt_ls = List.fold_left (
@@ -451,7 +464,9 @@ and type_decl env od =
   let eff, res = b.tag.result in
   let t_res = fresh_eff (TVar (V.create ())) in
   unify body.pos t_res (kwutype_to_typ res);
-
+  
+  cur_res := t_res;
+  
   let t_decl = (TFun (t_ls, t_res),
                 eff_from_str eff) in
   let new_env = { !env with types = Idmap.add d.name t_decl n_env.types } in
@@ -460,12 +475,28 @@ and type_decl env od =
   let tb = type_body new_env body in
   (* unify body.pos t_res tb.typ; *) (* x doubt *)
 
-  (* on crie si lutilisateur na pas mis le
-  div, (par contre, osef sil a mis console et que console 
-  est inutile *)
+  (* we shout if the usr didn't add the div effect
+    but he is allowed to add console and div even if useless *)
   if Idmap.mem !cur_id !divg && 
-    not (has_eff_t Div (Idmap.find !cur_id !env.types)) then 
+    not (List.mem "div" eff) then 
       raise (Error (od.pos, "function " ^ !cur_id ^ " should have effect div."));
+
+  if (has_eff_t Console (Idmap.find !cur_id !env.types))
+    && not (List.mem "console" eff) then 
+      raise (Error (od.pos, "function " ^ !cur_id ^ " should have effect console."));
+
+  (* check if args have distinct names *)
+  let seen = ref Idmap.empty in
+  List.iter (
+    fun (id, kt) ->
+      if Idmap.mem id !seen then
+        raise (Error (od.pos, "function " ^ !cur_id ^ " should have
+                              distinct arguments names but " ^ id ^ " has
+                              multiple occurences."));
+      seen := Idmap.add id true !seen;
+  ) b.args;
+
+  if has_eff_t Console tb.typ then Printf.printf "concon\n";
 
   { tdecl = { name = d.name; tbody = tb }; typ = tb.typ }
 
@@ -490,4 +521,6 @@ and type_file file =
       end
   ) !constraints;
 
+  if not (Idmap.mem "main" !defs) then 
+    raise (Error ((dummy_pos, dummy_pos), "the file has no main."));
   ast
