@@ -322,7 +322,7 @@ and type_expr env exp = match exp.expr with
       { texpr = TEList tls; typ = (TList (List.hd tls).typ, eff) }
     end
   | ECall (e, args) ->
-    let pre_def = ["println"] in
+    let pre_def = ["println"; "repeat"] in
     begin
       match get_call_id e with
         | Some id when List.mem id pre_def ->
@@ -353,6 +353,41 @@ and type_expr env exp = match exp.expr with
                                                       (singleton_eff Console))
                           }, [te]);
                   typ = (TUnit, union_eff_t te.typ print_t) }
+              | "repeat" ->
+                if List.length args <> 2 then
+                  raise (Error (exp.pos, "repeat requires two arguments."));
+
+                let te1 = type_expr env (List.hd args) in
+                constraints := ([TInt], te1.typ,
+                                Error (exp.pos, "repeat requires an int as
+                                                 first argument."))
+                            ::!constraints;
+                
+                let te2 = type_expr env (List.nth args 1) in
+                constraints := ([TFun ([no_eff TUnit], no_eff TInt)], te1.typ,
+                                Error (exp.pos, "repeat requires () -> int as
+                                                  second argument."))
+                            ::!constraints;
+                let eps = (match head te1.typ with 
+                            | TFun (args, res), eff ->
+                              head_eff res (* x doubt ? *)
+                            | _ -> ESet Effset.empty)
+                            (* type validity is checked later... *)
+                          in
+
+                let repeat_t = (TFun ([te1.typ; te2.typ], (TUnit, ESet Effset.empty)),
+                               ESet Effset.empty) in
+                let ueff = union_eff_e (head_eff te1.typ) 
+                                       (union_eff_e (head_eff te2.typ)
+                                                    eps) in
+                { texpr = TECall ({
+                            texpr = TECst {
+                              tconst = TCVar "repeat";
+                              typ = repeat_t
+                            };
+                            typ = (TUnit, ueff)
+                          }, [te1; te2]);
+                  typ = (TUnit, ueff) }
               | _ -> failwith "todo\n"
           end
         | Some id ->
@@ -390,9 +425,11 @@ and type_expr env exp = match exp.expr with
             raise (Error (exp.pos, id ^ " is not declared.")))
         (* we could handle definition in the wrong order (def f: g(), def g: ())
         by using the constraints list *)
-        | None -> raise (Error (exp.pos, "uncallable object was called"));
+        | None -> 
+          pp_expr Format.std_formatter e;
+          raise (Error (exp.pos, "uncallable object was called"));
     end;
-  | _ -> failwith "todo\n"
+  | _ -> failwith "todooo\n"
 
 and type_block env bl =
   let env = ref env in
@@ -516,7 +553,7 @@ and type_decl env od =
       union_eff_e (head_eff tb.typ) (singleton_eff Div)
     else
       head_eff tb.typ in
-      
+
   let tfun = if eff <> ["ff"] then t_decl else (fst t_decl, inf_eff) in
   env := { !env with types = Idmap.add !cur_id tfun !env.types };
 
@@ -536,6 +573,9 @@ and type_file file =
     fun (cons, t, err) ->
       begin
         match head_typ t with
+          | TFun ([(TUnit, _)], (TInt, _)) ->
+            if not (List.mem (TFun ([no_eff TUnit], no_eff TInt)) cons) then
+              raise err;
           | TList tau ->
             if not (List.mem (TList (TUnit, ESet Effset.empty)) cons) then
               raise err;

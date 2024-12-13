@@ -20,6 +20,12 @@
   let is_not_call exp = match exp.expr with
     | ECall (e, ls) -> false
     | _ -> true
+
+  (* unwrap call, to avoid having
+  Call (repeat, e1) e2 *)
+  let unwrap_call exp = match exp.expr with
+    | ECall (e, ls) -> e, ls
+    | e -> raise Expr_is_a_call
 %}
 
 /* Définitions des priorités et associativités des tokens */
@@ -198,36 +204,56 @@ atom:
 | LPAR RPAR { {expr = ECst {const = CUnit; 
                             pos = ($startpos, $endpos)};
               pos = ($startpos, $endpos) } }
-| a = atom DOT id = ident { if is_not_call a then { expr = ECall (
-                                                              { 
-                                                                expr = ECst ({const = CString id;
-                                                                              pos = ($startpos, $endpos)
-                                                                            }); 
-                                                                pos = ($startpos, $endpos)
-                                                              }
-                                                              ,[a]
-                                                            );
-                                                    pos = ($startpos, $endpos) }
-                            else raise Expr_is_a_call } (* TODO CHECK E NOT CALL *)
+| a = atom DOT id = ident { { expr = ECall (
+                                        { 
+                                          expr = ECst ({const = CString id;
+                                                        pos = ($startpos, $endpos)
+                                                      }); 
+                                          pos = ($startpos, $endpos)
+                                        }
+                                        ,[a]
+                                      );
+                              pos = ($startpos, $endpos) }
+                            } 
 | a = atom LPAR ls = separated_list(COMMA, expr) RPAR { { expr = ECall (a, ls);
                                                           pos = ($startpos, $endpos) } }
 | LBRACKET ls = separated_list(COMMA, expr) RBRACKET { { expr = EList ls;
                                                          pos = ($startpos, $endpos) } }
 | a = atom b = block 
-  { { 
+  {
+    let f, args =
+      if is_not_call a then a, []
+      else unwrap_call a
+    in
+    { 
       expr =  
-        ECall (a,
-          [{expr=EFn ({funbody={
-              args = [];
-              tag = {result=([], {kwutype = KUnit; pos = ($startpos, $endpos)});
-                      pos = ($startpos, $endpos)};
-              content = {expr = EBlock b; pos = ($startpos, $endpos) }
-            };pos = ($startpos, $endpos)}); pos = ($startpos, $endpos)}]);
+        ECall (f,
+              
+              args@[{expr=EFn ({funbody={
+                                args = [];
+                                tag = {
+                                  result=([],
+                                          {kwutype = KUnit;
+                                          pos = ($startpos, $endpos)});
+                                  pos = ($startpos, $endpos)};
+                                content = {
+                                  expr = EBlock b; 
+                                  pos = ($startpos, $endpos) }
+                              };
+                     pos = ($startpos, $endpos)}); pos = ($startpos, $endpos)}]);
       pos = ($startpos, $endpos)
     }
   }
-| e = atom FN body = funbody { {expr = ECall (e, [{ expr = EFn body; pos = ($startpos, $endpos) } ]);
-                                pos = ($startpos, $endpos) } }
+| e = atom FN body = funbody {
+    let f, args =
+      if is_not_call e then e, []
+      else unwrap_call e
+    in 
+    {
+      expr = ECall (f, args@[{ expr = EFn body; pos = ($startpos, $endpos) } ]);
+      pos = ($startpos, $endpos)
+    }
+  }
 ;
 
 block:
