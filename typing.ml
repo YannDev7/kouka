@@ -31,7 +31,7 @@ let rec cannon tb = match head tb with
 let head_typ t = fst (head t)
 let head_eff t = snd (head t)
 
-let no_eff tv = (tv, Eset (Effset.empty))
+let no_eff tv = (tv, ESet (Effset.empty))
 
 let fresh_eff tv = (tv, TEff (VEff.create ()))
 
@@ -63,11 +63,11 @@ let rec unify pos t1 t2 = match head t1, head t2 with
     tv2.def <- Some (t1, e1)
   | (t1, e1), (t2, e2) when t1 = t2 ->
     unify_eff pos e1 e2;
-    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); (* x doubt *)
+    (* if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); *) (* x doubt *)
   | (TList t1, e1), (TList t2, e2) ->
     unify_eff pos e1 e2;
     unify pos t1 t2;
-    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); (* x doubt *)
+    (* if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); *) (* x doubt *)
   | (TFun (args1, res1), e1), (TFun (args2, res2), e2) ->
     List.iter (fun (a1, a2) -> unify pos a1 a2) 
               (List.combine args1 args2);
@@ -160,13 +160,13 @@ and type_binop pos op te1 te2 = match op with
       ignore(te1.texpr); ignore(te2.texpr);
       unify pos te1.typ te2.typ;
       
-      constraints := ([TString, TList TUnit], te1.typ, Error (pos, "++ only supports list and strings."))
+      constraints := ([TString; TList (TUnit, ESet Effset.empty)], te1.typ, Error (pos, "++ only supports list and strings."))
                       ::!constraints;
-      constraints := ([TString, TList TUnit], te2.typ, Error (pos, "++ only supports list and strings."))
+      constraints := ([TString; TList (TUnit, ESet Effset.empty)], te2.typ, Error (pos, "++ only supports list and strings."))
                       ::!constraints;
 
       let t = ((TVar (V.create ())), union_eff te1.typ te2.typ) in
-      unify t te1.typ;
+      unify pos t te1.typ;
 
       { texpr = TEBinop (op, te1, te2);
           typ = t }
@@ -182,12 +182,12 @@ and type_expr env exp = match exp.expr with
     { texpr = TEBlock tb; typ = tb.typ }
   | ENot e ->
     let te = type_expr env e in
-    constraints := ([TBool], te.typ, Error (pos, "! requires bool."))
+    constraints := ([TBool], te.typ, Error (exp.pos, "! requires bool."))
                    ::!constraints;
     { texpr = TENot te; typ = te.typ }
   | ETilde e ->
     let te = type_expr env e in
-    constraints := ([TInt], te.typ, Error (pos, "~ requires int."))
+    constraints := ([TInt], te.typ, Error (exp.pos, "~ requires int."))
                    ::!constraints;
     { texpr = TETilde te; typ = te.typ }
   | EBinop (op, e1, e2) ->
@@ -218,26 +218,26 @@ and type_expr env exp = match exp.expr with
     let te2 = type_expr env e2 in
     let te3 = type_expr env e3 in
 
-    constraints := ([TBool], te.typ, Error (pos, "condition doesn't evaluate to boolean."))
+    constraints := ([TBool], te1.typ, Error (exp.pos, "condition doesn't evaluate to boolean."))
                    ::!constraints;
 
-    unify_no_eff exp.pos te2.typ te3.typ;
+    unify exp.pos te2.typ te3.typ;
     { texpr = TEIf_then_else (te1, te2, te3);
-      typ = union_eff (union_eff te1.typ te2.typ)
-                        te3.typ }
+      typ = ((head_typ te2.typ), EUnion (union_eff te1.typ te2.typ,
+                        head_eff te3.typ)) }
   | EList ls ->
     if ls = [] then { texpr = TEList []; typ = fresh_eff (TVar (V.create ())) }
     else begin
       let tls = List.map (fun ei -> type_expr env ei) ls in
-      List.iter ((fun tei -> ignore(tei.texpr); (* ocaml magic... *)
-                             unify tei.typ (List.hd tls).typ)
-                tls);
+      List.iter (fun tei -> ignore(tei.texpr); (* ocaml magic... *)
+                             unify exp.pos tei.typ (List.hd tls).typ)
+                tls;
 
       let eff = List.fold_left
                   (fun cur_eff tei -> ignore(tei.texpr);
-                                      union_eff cur_eff (head_eff tei.typ))
-                  (head_eff (List.hd tls)) tls in
-      { texpr = TEList tls; typ = (TList (head_typ (List.hd tls).typ), eff) }
+                                      EUnion (cur_eff, (head_eff tei.typ)))
+                  (head_eff (List.hd tls).typ) tls in
+      { texpr = TEList tls; typ = (TList (List.hd tls).typ, eff) }
     end
   | ECall (e, args) ->
     let pre_def = ["println"] in
@@ -246,24 +246,27 @@ and type_expr env exp = match exp.expr with
         | Some id when List.mem id pre_def ->
           begin
             match id with
-              (*| "println" ->
+              | "println" ->
                 if List.length args <> 1 then
                   raise (Error (exp.pos, "println requires exactly one argument."));
 
                 let te = type_expr env (List.hd args) in
-                if not (List.mem (head_typ te.typ) [TUnit; TBool; TInt; TString]) then
-                  raise (Error (exp.pos, "println requires constant arguments."));
+                constraints := ([TUnit; TBool; TInt; TString], 
+                                te.typ,
+                                Error (exp.pos, "println requires constant arguments."))
+                            ::!constraints;
 
                 (* probably do not care about type of Cst println *)
+                let print_t = (TFun ([te.typ], (TUnit, ESet (Effset.singleton Console))),
+                               ESet (Effset.singleton Console)) in
                 { texpr = TECall ({
                             texpr = TECst {
                               tconst = TCVar "println";
-                              typ = (TFun ([head_typ te.typ], no_eff TUnit), 
-                                    (false, true));
+                              typ = print_t
                             };
-                            typ = (TUnit, (false, true))
+                            typ = (TUnit, ESet (Effset.singleton Console))
                           }, [te]);
-                  typ = (TUnit, union_eff (snd te.typ) (false, true)) }*)
+                  typ = (TUnit, union_eff te.typ print_t) }
               | _ -> failwith "todo\n"
           end
         | _ -> failwith "todo\n";
@@ -283,7 +286,7 @@ and type_block env bl =
       let st = type_stmt env hd in
       let tb = aux tl in
       (* type of block is the type of the last stmt *)
-      {tblock = st::tb.tblock; typ = union_eff st.typ tb.typ }
+      {tblock = st::tb.tblock; typ = (head_typ tb.typ, union_eff st.typ tb.typ) }
   in aux bl
 
 (* note: this is essentially the base case of type_block.
@@ -315,16 +318,27 @@ and type_body env b =
 and type_decl env d =
   let d = d.decl in
   let body = d.body in
-  let tb = type_body env body inTBool in
+  let tb = type_body env body in
+  { tdecl = { name = d.name; tbody = tb }; typ = tb.typ }
+
+and type_file file =
+  let env = ref { types = Idmap.empty; vars = Idmap.empty} in
+  let rec aux = function
+    | [] -> []
+    | hd::tl -> type_decl !env hd::aux tl
+  in
+  let ast = aux file in
   List.iter (
     fun (cons, t, err) ->
       begin
         match head_typ t with
           | TList tau ->
-            if not (List.mem (TList TUnit) cons) then
+            if not (List.mem (TList (TUnit, ESet Effset.empty)) cons) then
               raise err;
           | ty ->
             if not (List.mem (head_typ t) cons) then
               raise err;
       end
-  ) !constraints
+  ) !constraints;
+
+  ast

@@ -21,7 +21,7 @@ and tvar = {
   mutable def: typ option;
 }
 and effects =
-  | Eset of Effset.t
+  | ESet of Effset.t
   | EUnion of effects * effects
   | TEff of teff
 and teff = {
