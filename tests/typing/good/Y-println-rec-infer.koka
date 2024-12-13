@@ -1,4 +1,4 @@
-fun f(n: int) : <div, console> int
+fun f(n: int)
   if n != 0 then
     println(f(n - 1))
     return 43

@@ -168,10 +168,19 @@ let rec type_const env const = match const.const with
   | CBool b -> { tconst = TCBool b; typ = no_eff TBool }
   | CInt i -> { tconst = TCInt i; typ = no_eff TInt }
   | CString s -> { tconst = TCString s; typ = no_eff TString }
-  | CVar id -> try { tconst = TCVar id; typ = Idmap.find id env.types }
-               with
-                | Not_found -> raise (Error (const.pos, 
-                                            "couldn't infer the type of " ^ id ^ "."))
+  | CVar id -> 
+    begin
+      try 
+        begin
+          let ans = { tconst = TCVar id; typ = Idmap.find id env.types } in
+          (* add div effect *)
+          if id = !cur_id then divg := Idmap.add id true !divg;
+          ans
+        end
+      with
+        | Not_found -> raise (Error (const.pos, 
+                                    "couldn't infer the type of " ^ id ^ "."))
+    end
 
 and type_binop pos op te1 te2 = match op with
   | Add | Sub | Mul | Div | Mod ->
@@ -447,41 +456,47 @@ and type_decl env od =
   defs := Idmap.add d.name true !defs;
 
   (* add args types to env *)
-  let n_env, rt_ls = List.fold_left (
-    fun (cur_env, t_ls) (a_id, ua_t) ->
+  let id_rt_ls = List.fold_left (
+    fun t_ls (a_id, ua_t) ->
       (* todo: create type effect here *)
       let a_t = (fresh_eff (TVar (V.create ()))) in
       unify body.pos a_t (kwutype_to_typ ua_t);
-      { cur_env with 
-        (* todo: what do we do when shadowing ? *)
-        types = Idmap.add a_id
-                          a_t
-                          cur_env.types },
-      a_t::t_ls
-  ) (!env, []) b.args in
+      (a_id, a_t)::t_ls
+  ) [] b.args in
 
-  let t_ls = List.rev rt_ls in
+  let id_t_ls = List.rev id_rt_ls in
+  let t_ls = List.map (fun (a, b) -> b) id_t_ls in
   let eff, res = b.tag.result in
   let t_res = fresh_eff (TVar (V.create ())) in
-  unify body.pos t_res (kwutype_to_typ res);
+
+  (* ff is banned in effects *)
+  if eff <> ["ff"] then
+    unify body.pos t_res (kwutype_to_typ res);
   
   cur_res := t_res;
   
   let t_decl = (TFun (t_ls, t_res),
-                eff_from_str eff) in
-  let new_env = { !env with types = Idmap.add d.name t_decl n_env.types } in
-  env := new_env;
+                if eff <> ["ff"] then eff_from_str eff
+                else ESet Effset.empty) in
+                
+  let new_env = List.fold_left (
+    fun cur_env (id, t) ->
+      { cur_env with types = Idmap.add id t cur_env.types}
+  ) !env ((d.name, t_decl)::id_t_ls) in
+
   Printf.printf "added %s\n" d.name;
   let tb = type_body new_env body in
   (* unify body.pos t_res tb.typ; *) (* x doubt *)
 
   (* we shout if the usr didn't add the div effect
     but he is allowed to add console and div even if useless *)
-  if Idmap.mem !cur_id !divg && 
+  if eff <> ["ff"] &&
+    Idmap.mem !cur_id !divg && 
     not (List.mem "div" eff) then 
       raise (Error (od.pos, "function " ^ !cur_id ^ " should have effect div."));
 
-  if (has_eff_t Console (Idmap.find !cur_id !env.types))
+  if eff <> ["ff"] &&
+    (has_eff_t Console tb.typ)
     && not (List.mem "console" eff) then 
       raise (Error (od.pos, "function " ^ !cur_id ^ " should have effect console."));
 
@@ -495,10 +510,19 @@ and type_decl env od =
                               multiple occurences."));
       seen := Idmap.add id true !seen;
   ) b.args;
+  
+  let inf_eff =
+    if Idmap.mem !cur_id !divg then
+      union_eff_e (head_eff tb.typ) (singleton_eff Div)
+    else
+      head_eff tb.typ in
+      
+  let tfun = if eff <> ["ff"] then t_decl else (fst t_decl, inf_eff) in
+  env := { !env with types = Idmap.add !cur_id tfun !env.types };
 
-  if has_eff_t Console tb.typ then Printf.printf "concon\n";
-
-  { tdecl = { name = d.name; tbody = tb }; typ = tb.typ }
+  if has_eff_t Console tfun then Printf.printf "concon\n";
+  if has_eff_t Div tfun then Printf.printf "didi\n";
+  { tdecl = { name = d.name; tbody = tb }; typ = tfun }
 
 and type_file file =
   let env = ref { types = Idmap.empty; vars = Idmap.empty} in

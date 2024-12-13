@@ -88,7 +88,7 @@ id = IDENT { id }
 funbody:
 | LPAR fargs = separated_list(COMMA, param) RPAR res_t = annot? fcontent = expr {
     match res_t with
-      | None -> { funbody = { args = fargs; content = fcontent; tag = { result = ([], { kwutype = KUnit; pos = ($startpos, $endpos) } );
+      | None -> { funbody = { args = fargs; content = fcontent; tag = { result = (["ff"], { kwutype = KUnit; pos = ($startpos, $endpos) } );
                                                                         pos = ($startpos, $endpos) } };
                               pos = ($startpos, $endpos) }
       | Some res -> { funbody = { args = fargs; content = fcontent; tag = res };
