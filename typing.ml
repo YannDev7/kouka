@@ -2,7 +2,7 @@ open Ast
 open Typed_ast
 open Pp
 open Lexing
-exception Error of pos * string
+open Exception
 
 module Idmap = Map.Make(String)
 
@@ -36,8 +36,8 @@ let head_typ t = fst (head t)
 let rec head_teff = function
   | TEff { edef = Some te } -> head_teff te
   | te -> te
-let head_eff t = (* head_teff (snd t) *)
-  snd (head t) (* todo: to update after 
+let head_eff t = head_teff (snd t)
+  (*snd (head t)*) (* todo: to update after 
                               having added teff *)
 
 let no_eff tv = (tv, ESet (Effset.empty))
@@ -47,13 +47,13 @@ let singleton_eff e = ESet (Effset.singleton e)
 teff *)
 let has_eff_e e teff = match head_teff teff with
   | ESet s -> Effset.mem e s
-  | _ -> failwith "raaah\n"
+  | _ -> false
 
 let has_eff_t ef t = has_eff_e ef (head_eff t)
 
 let fresh_eff tv = 
-  (*(tv, TEff (VEff.create ()))*)
-  (tv, ESet Effset.empty)
+  (tv, TEff (VEff.create ()))
+  (*(tv, ESet Effset.empty)*)
 
 let eff_set_t t = match head_eff t with
   | ESet s -> s
@@ -63,17 +63,17 @@ let eff_set_e = function
   | ESet s -> s
   | _ -> failwith "todo:\n"
 
+(* Assumes both are ESet.
+TODO: allow effect variables in ESet. *)
+let union_eff_e e1 e2 = match head_teff e1, head_teff e2 with
+  | ESet s1, ESet s2 -> ESet (Effset.union s1 s2)
+  | _, _ -> e2 (* arbitrary (will make sure the Div is added though) *)
+  (*ESet (Effset.union (eff_set_e e1) (eff_set_e e2))*)
+
 let union_eff_t t1 t2 =
   (* EUnion (head_eff t1, head_eff t2) *)
-  ESet (Effset.union (eff_set_t t1) (eff_set_t t2))
-
-let union_eff_e e1 e2 =
-  ESet (Effset.union (eff_set_e e1) (eff_set_e e2))
-
-(* let union_eff_e e1 e2 = match head_teff e1, head_teff e2 with
-  | TEff te1, TEff te2 when te1.eid = te2.eid -> te1
-  | ESet s1, ESet s2 -> ESet (Effset.union s1 s2)
-  | ESet s1, TEff te2 -> *)
+  (* ESet (Effset.union (eff_set_t t1) (eff_set_t t2)) *)
+  union_eff_e (head_eff t1) (head_eff t2)
 
 let rec eff_from_str = function
   | [] -> ESet (Effset.empty)
@@ -122,11 +122,22 @@ let rec unify pos t1 t2 = match head t1, head t2 with
   | (TMaybe t1, e1), (TMaybe t2, e2) ->
     (*if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));*) (* x doubt *)
     unify pos t1 t2
-  | _, _ -> raise (Error (pos, "unify: error"))
+  | _, _ -> raise (Error (pos, "unify: error."))
 
-and unify_eff pos e1 e2 =
-  if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"))
-
+and occur_eff teff eff = match head_teff eff with 
+  | ESet s -> false
+  | TEff te -> te.eid = teff.eid
+and unify_eff pos e1 e2 = match head_teff e1, head_teff e2 with
+  | TEff te1, TEff te2 when te1.eid = te2.eid -> ()
+  | ESet s1, ESet s2 -> if s1 <> s2 then raise (Error (pos, "unify effect: error"))
+  | e1, TEff te2 ->
+    if occur_eff te2 e1 then raise (Error (pos, "unify effect: cycle."));
+    te2.edef <- Some e1;
+  | TEff te1, e2 ->
+    if occur_eff te1 e2 then raise (Error (pos, "unify effect: cycle."));
+    te1.edef <- Some e2 
+(*| e1, e2 when e1 = e2 -> () *)
+  | _, _ -> raise (Error (pos, "unsuported unify effect."))
 let get_call_id e = match e.expr with
   | ECst cst ->
     begin
@@ -187,6 +198,7 @@ let constraints = ref []
 
 let cnt_ano = ref 0
 
+let cur_id = ref ""
 let b_id = ""
 let b_res = ref (no_eff TUnit)
 
@@ -213,6 +225,7 @@ let rec type_const env const = match const.const with
           let ans = { tconst = TCVar id; typ = Idmap.find id env.types } in
           (* add div effect *)
           if id = Stack.top cur_ids then divg := Idmap.add id true !divg;
+          if id = !cur_id then divg := Idmap.add id true !divg;
           ans
         end
       with
@@ -360,7 +373,7 @@ and type_expr env exp = match exp.expr with
       { texpr = TEList tls; typ = (TList (List.hd tls).typ, eff) }
     end
   | ECall (e, args) ->
-    let pre_def = ["println"; "repeat"; "while"; "for"] in
+    let pre_def = ["println"; "repeat"; "while"; "for"; "head"; "tail"; "default"] in
     begin
       match get_call_id e with
         | Some id when List.mem id pre_def ->
@@ -495,12 +508,79 @@ and type_expr env exp = match exp.expr with
                             typ = (TUnit, ueff)
                           }, [te1; te2; te3]);
                   typ = (TUnit, ueff) }
+              | "head" ->
+                if List.length args <> 1 then
+                  raise (Error (exp.pos, "head requires exactly one argument."));
+
+                let te = type_expr env (List.hd args) in
+                let tau = no_eff (TVar (V.create ())) in
+                constraints := ([TList tau], 
+                                te.typ,
+                                Error (exp.pos, "head requires list<tau> as argument."))
+                            ::!constraints;
+
+                let head_t = (TFun ([te.typ],  (TMaybe (tau), head_eff te.typ)),
+                              ESet Effset.empty) in
+                { texpr = TECall ({
+                            texpr = TECst {
+                              tconst = TCVar "head";
+                              typ = head_t
+                            };
+                            typ = (TMaybe (tau), head_eff te.typ)
+                          }, [te]);
+                  typ = (TMaybe (tau), union_eff_t te.typ head_t) }
+              | "tail" ->
+                if List.length args <> 1 then
+                  raise (Error (exp.pos, "tail requires exactly one argument."));
+
+                let te = type_expr env (List.hd args) in
+                let tau = no_eff (TVar (V.create ())) in
+                constraints := ([TList tau], 
+                                te.typ,
+                                Error (exp.pos, "tail requires list<tau> as argument."))
+                            ::!constraints;
+
+                let tail_t = (TFun ([te.typ],  (TList (tau), head_eff te.typ)),
+                              ESet Effset.empty) in
+                { texpr = TECall ({
+                            texpr = TECst {
+                              tconst = TCVar "tail";
+                              typ = tail_t
+                            };
+                            typ = (TList (tau), head_eff te.typ)
+                          }, [te]);
+                  typ = (TList (tau), union_eff_t te.typ tail_t) }
+              | "default" ->
+                if List.length args <> 2 then
+                  raise (Error (exp.pos, "default requires exactly two arguments."));
+
+                let te1 = type_expr env (List.hd args) in
+                let te2 = type_expr env (List.nth args 1) in
+
+                constraints := ([TMaybe te2.typ], 
+                                te1.typ,
+                                Error (exp.pos, "default requires maybe<tau> and tau as arguments."))
+                            ::!constraints;
+
+                let eff = (union_eff_t te1.typ te2.typ) in
+                let default_t = (TFun ([te1.typ; te2.typ], (head_typ te2.typ, eff)),
+                              ESet Effset.empty) in
+                { texpr = TECall ({
+                            texpr = TECst {
+                              tconst = TCVar "default";
+                              typ = default_t
+                            };
+                            typ = (head_typ te2.typ, eff)
+                          }, [te1; te2]);
+                  typ = (head_typ te2.typ, eff) }
               | _ -> failwith "todo\n"
           end
         | Some id ->
           (try
             let ft = Idmap.find id env.types in
             if id = Stack.top cur_ids then divg := Idmap.add id true !divg;
+            if id = !cur_id then divg := Idmap.add id true !divg;
+
             begin
               match head ft with
                 | TFun (targs, res), eff ->
@@ -608,6 +688,7 @@ and type_decl env od =
   let b = body.funbody in
   
   Stack.push d.name cur_ids;
+  cur_id := d.name;
   Printf.printf "adding %s\n" d.name;
 
   if Idmap.mem d.name !defs then
@@ -716,28 +797,63 @@ and type_file file =
                 nh::aux tl
   in
   let ast = aux file in
-  List.iter (
-    fun (cons, t, err) ->
-      (*pp_typ Format.std_formatter t;*)
-      begin
-        match head_typ (cannon t) with
-          | TFun ([], (TUnit, _)) ->
-            if not (List.mem (TFun ([], no_eff TUnit)) cons) then
-              raise err;
-          | TFun ([], (TBool, _)) ->
-            if not (List.mem (TFun ([], no_eff TBool)) cons) then
-              raise err;
-          | TFun([TInt, _], (TUnit, _)) ->
-            if not (List.mem (TFun ([no_eff TInt], no_eff TUnit)) cons) then
-              raise err;
-          | TList tau ->
-            if not (List.mem (TList (TUnit, ESet Effset.empty)) cons) then
-              raise err;
-          | ty ->
-            if not (List.mem (head_typ t) cons) then
-              raise err;
-      end
-  ) !constraints;
+  let resolve_const p_err =
+    List.iter (
+      fun (cons, t, err) ->
+        (*pp_typ Format.std_formatter t;*)
+        fpp_typ (cannon t);
+        begin
+          match head_typ (cannon t) with
+            | TFun ([], (TUnit, _)) ->
+              if p_err && (not (List.mem (TFun ([], no_eff TUnit)) cons)) then
+                raise err;
+            | TFun ([], (TBool, _)) ->
+              if p_err && (not (List.mem (TFun ([], no_eff TBool)) cons)) then
+                raise err;
+            | TFun([TInt, _], (TUnit, _)) ->
+              if p_err && (not (List.mem (TFun ([no_eff TInt], no_eff TUnit)) cons)) then
+                raise err;
+            | TList tau ->
+              fpp_typ (cannon t);
+              let cnt = ref 0 in
+              List.iter (
+                fun t ->
+                  begin 
+                    match t with
+                      | TList ((TUnit, _)) -> incr cnt
+                      | TList tau2 -> fpp_typ (no_eff (TList tau2));
+                                      unify (get_pos err) tau tau2;
+                                      incr cnt;
+                      | _ -> ()
+                  end
+              ) cons;
+
+              if p_err && !cnt = 0 then raise err;
+            | TMaybe tau ->
+              fpp_typ (cannon t);
+              let cnt = ref 0 in
+              List.iter (
+                fun t ->
+                  begin 
+                    match t with
+                      | TMaybe tau2 -> fpp_typ (no_eff (TMaybe tau2));
+                                      unify (get_pos err) tau tau2;
+                                      incr cnt;
+                      | _ -> ()
+                  end
+              ) cons;
+
+              if p_err && !cnt = 0 then raise err;
+            | ty ->
+              Printf.printf "wannnnt\n";
+              fpp_typ (cannon (no_eff ty));
+              if p_err && (not (List.mem (head_typ (cannon t)) cons)) then
+                raise err;
+        end
+    ) !constraints in
+
+  resolve_const false;
+  resolve_const true;
 
   if not (Idmap.mem "main" !defs) then 
     raise (Error ((dummy_pos, dummy_pos), "the file has no main."));

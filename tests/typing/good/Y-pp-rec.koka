@@ -1,0 +1,10 @@
+fun pp_ls(ls: list<int>): <console, div> unit
+  if True return ()
+  println(default(head(ls), 42))
+  pp_ls(tail(ls))
+
+fun main()
+  var x := [];
+  var y := head(x);
+  x := x ++ [42];
+  pp_ls(x);

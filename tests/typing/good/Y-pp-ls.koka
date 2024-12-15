@@ -1,0 +1,9 @@
+fun pp_ls(ls: list<int>)
+  while { True }
+    println(default(head(ls), 42))
+
+fun main()
+  var x := [];
+  var y := head(x);
+  x := x ++ [42];
+  pp_ls(x);

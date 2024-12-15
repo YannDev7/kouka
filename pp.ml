@@ -89,7 +89,6 @@ let rec pp_eff fmt = function
     (match te.edef with
       | None -> fprintf fmt "t_eff"
       | Some t -> fprintf fmt "te=>(%a)" pp_eff t)
-  | _ -> failwith "teff not supported yet.\n"
 
 let rec pp_typ_val fmt = function
   | TUnit -> fprintf fmt "UNIT"

@@ -44,7 +44,7 @@ let () =
     if !parse_only then exit 0;
     (*Interp.file f*)
 
-    ignore(let tast = Typing.type_file _f in ());
+    let () = ignore(Typing.type_file _f) in ();
 
     if !type_only then exit 0;
   with
@@ -60,7 +60,7 @@ let () =
   report (lexeme_start_p lb, lexeme_end_p lb);
   eprintf "syntax error, block not ending with expr@.";
   exit 1
-    | Typing.Error (pos, s) ->
+    | Error (pos, s) ->
   report pos;
   eprintf "typing error, %s@." s;
   exit 1

@@ -22,7 +22,7 @@ and tvar = {
 }
 and effects =
   | ESet of Effset.t
-  | EUnion of effects * effects
+(*  | EUnion of effects * effects *)
   | TEff of teff
 and teff = {
   eid: int;
