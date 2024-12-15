@@ -9,7 +9,7 @@ Mon compilateur passe tous les tests de la partie 1 et 2. Toutefois, mon infére
 > make test2
 - on peut utiliser le compilateur ainsi:
 > ./kokac.exe main.koka
-- Un sous ensemble intéressant des tests que j'ai écrit se trouvent dans les dossiers tests/typing et tests/syntax. Ils sont préfixés de "Y-".
+- Un sous ensemble intéressant des tests que j'ai écrit se trouve dans les dossiers tests/typing et tests/syntax. Ils sont préfixés de "Y-".
 - le fichier **pp.ml** contient des pretty printer plus ou moins complets (typiquement, pour le typage, je me suis contenté d'afficher les types plutôt que l'ast typé)
 
 # Lexer, parser:
@@ -26,7 +26,7 @@ val a-a = 42;
 val a = 0; 
 val c = a-a + a; // c != a
 ```
-- on accepte avec une regex un ensmelbe d'**ident** plus gros que voulu et l'on vérifie ensuite la validité manuellement.
+- on accepte avec une regex un ensemble d'**ident** plus gros que voulu et l'on vérifie ensuite la validité manuellement.
 
 
 - il y a des warning menhir (notamment parce que le token **ELIF** n'est pas utilisé dans **parser.mly**)
