@@ -499,7 +499,6 @@ and type_decl env od =
   let b = body.funbody in
   
   Stack.push d.name cur_ids;
-  cur_id := d.name;
   Printf.printf "adding %s\n" d.name;
 
   if Idmap.mem d.name !defs then
@@ -536,7 +535,7 @@ and type_decl env od =
   
   let t_decl = (TFun (t_ls, !t_res),
                 if eff <> ["ff"] then eff_from_str eff
-                else ESet Effset.empty) in
+                else TEff (VEff.create ())) in
 
   let new_env = List.fold_left (
     fun cur_env (id, t) ->
@@ -550,6 +549,7 @@ and type_decl env od =
   Printf.printf "BEGIN tyty %s\n" d.name;
   fpp_typ !t_res;
   fpp_typ tb.typ;
+
   unify body.pos !t_res tb.typ; (* x doubt *)
 
   fpp_typ !t_res;
@@ -603,7 +603,9 @@ and type_file file =
   let env = ref { types = Idmap.empty; vars = Idmap.empty} in
   let rec aux = function
     | [] -> []
-    | hd::tl -> let nh = (type_decl !env hd) in (* otherwise, wrong order *)
+    | hd::tl -> 
+                cur_id := hd.decl.name;
+                let nh = (type_decl !env hd) in (* otherwise, wrong order *)
                 env := { !env with types = Idmap.add hd.decl.name nh.typ !env.types };
                 nh::aux tl
   in
