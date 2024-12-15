@@ -499,7 +499,7 @@ and type_decl env od =
   let b = body.funbody in
   
   Stack.push d.name cur_ids;
-  Printf.printf "adding %s\n" d.name;
+  (*Printf.printf "adding %s\n" d.name;*)
 
   if Idmap.mem d.name !defs then
     raise (Error (od.pos, "function " ^ d.name ^ " is defined more
@@ -526,7 +526,7 @@ and type_decl env od =
 
   (* ff is banned in effects *)
   if eff <> ["ff"] then begin
-    Printf.printf "using user sig for %s\n" d.name;
+    (*Printf.printf "using user sig for %s\n" d.name;*)
     unify body.pos !t_res (kwutype_to_typ res);
     t_res := (fst !t_res, eff_from_str eff);
   end;
@@ -542,19 +542,19 @@ and type_decl env od =
       { cur_env with types = Idmap.add id t cur_env.types}
   ) env ((d.name, t_decl)::id_t_ls) in
 
-  Printf.printf "added %s\n" d.name;
-  fpp_typ t_decl;
+  (*Printf.printf "added %s\n" d.name;*)
+  (*fpp_typ t_decl;*)
   let tb = type_body new_env body in
 
-  Printf.printf "BEGIN tyty %s\n" d.name;
+  (*Printf.printf "BEGIN tyty %s\n" d.name;
   fpp_typ !t_res;
-  fpp_typ tb.typ;
+  fpp_typ tb.typ;*)
 
   unify body.pos !t_res tb.typ; (* x doubt *)
 
-  fpp_typ !t_res;
+  (*fpp_typ !t_res;
   fpp_typ (cannon t_decl);
-  Printf.printf "END tyty %s\n" d.name;
+  Printf.printf "END tyty %s\n" d.name;*)
 
   (* we shout if the usr didn't add the div effect
     but he is allowed to add console and div even if useless *)
@@ -587,8 +587,8 @@ and type_decl env od =
 
   let tfun = if eff <> ["ff"] then t_decl else (fst t_decl, inf_eff) in
 
-  if has_eff_t Console tfun then Printf.printf "concon\n";
-  if has_eff_t Div tfun then Printf.printf "didi\n";
+  (*if has_eff_t Console tfun then Printf.printf "concon\n";
+  if has_eff_t Div tfun then Printf.printf "didi\n";*)
   
   ignore(Stack.pop cur_ids);
   ignore(Stack.pop cur_ress);
@@ -614,7 +614,7 @@ and type_file file =
     List.iter (
       fun (cons, t, err) ->
         (*pp_typ Format.std_formatter t;*)
-        fpp_typ (cannon t);
+        (*fpp_typ (cannon t);*)
         begin
           match head_typ (cannon t) with
             | TFun ([], (TUnit, _)) ->
@@ -627,14 +627,14 @@ and type_file file =
               if p_err && (not (List.mem (TFun ([no_eff TInt], no_eff TUnit)) cons)) then
                 raise err;
             | TList tau ->
-              fpp_typ (cannon t);
+              (*fpp_typ (cannon t);*)
               let cnt = ref 0 in
               List.iter (
                 fun t ->
                   begin 
                     match t with
                       | TList ((TUnit, _)) -> incr cnt
-                      | TList tau2 -> fpp_typ (no_eff (TList tau2));
+                      | TList tau2 -> (*fpp_typ (no_eff (TList tau2));*)
                                       unify (get_pos err) tau tau2;
                                       incr cnt;
                       | _ -> ()
@@ -643,13 +643,13 @@ and type_file file =
 
               if p_err && !cnt = 0 then raise err;
             | TMaybe tau ->
-              fpp_typ (cannon t);
+              (*fpp_typ (cannon t);*)
               let cnt = ref 0 in
               List.iter (
                 fun t ->
                   begin 
                     match t with
-                      | TMaybe tau2 -> fpp_typ (no_eff (TMaybe tau2));
+                      | TMaybe tau2 -> (*fpp_typ (no_eff (TMaybe tau2));*)
                                       unify (get_pos err) tau tau2;
                                       incr cnt;
                       | _ -> ()
@@ -658,8 +658,8 @@ and type_file file =
 
               if p_err && !cnt = 0 then raise err;
             | ty ->
-              Printf.printf "wannnnt\n";
-              fpp_typ (cannon (no_eff ty));
+              (*Printf.printf "wannnnt\n";
+              fpp_typ (cannon (no_eff ty));*)
               if p_err && (not (List.mem (head_typ (cannon t)) cons)) then
                 raise err;
         end
