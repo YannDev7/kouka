@@ -65,3 +65,20 @@ Essentiellement, c'est parce que le bloc
 n'aura pas l'effet console, seulement le type de retour de la fonction anonyme l'aura. Je peux régler le problème facilement (pour typer un appel de fonction, il suffit de regarder si parmi les arguments passés il y en a un dont le type est une fonction dont le type a un effet).
 
 Je ne sais pas si ce comportement est attendu (d'après le **test while-1** je suppose que oui ?) ou non donc j'ignore temporairement ce problème.
+
+- Un autre problème (mais je pense que c'est normal)
+```fun pp_ls(ls: list<int>) {
+  if True return 42
+  return 42
+}
+```
+ 
+est bien typé
+
+alors que
+```
+fun pp_ls(ls: list<int>) {
+  if True return 42
+}```
+
+ne l'est pas. Mais dans les faits il n'y a aucun moyen de savoir que la condition du if est tout le temps vraie.

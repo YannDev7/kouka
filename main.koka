@@ -1,1 +1,0 @@
-fun foo(f: () -> (int), x: int) { var x = 3; };

@@ -1,9 +1,0 @@
-fun f(n: int)
-  if n != 0 then
-    println(f(n - 1))
-    return 43
-  else
-    return 42
-
-fun main()
-  f(42)
