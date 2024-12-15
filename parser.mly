@@ -116,7 +116,7 @@ param:
 when ls of size 1... 
 
 idea: type list ? 
-sol: we retard reading the comma!
+sol: we delay reading the comma!
 if we read at least one type and then something with comma*)
 
 (*
@@ -177,7 +177,7 @@ lt_ident_ls_gt:
 (* EXPR BLOCKS STMT *)
 
 // when in expr, read bexpr first (vs block)
-expr: // magic inline
+expr:
 | b = block { { expr = EBlock b; pos = ($startpos, $endpos) } }
 | e = bexpr %prec bexpr_p { e }
 ;

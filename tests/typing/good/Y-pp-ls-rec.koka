@@ -1,4 +1,4 @@
-fun pp_ls(ls: list<int>): <console, div> unit
+fun pp_ls(ls: list<int>)
   if True return ()
   println(default(head(ls), 42))
   pp_ls(tail(ls))
