@@ -26,7 +26,7 @@ and effects =
   | TEff of teff
 and teff = {
   eid: int;
-  mutable edef: teff option
+  mutable edef: effects option
 }
 and typ = typ_val * effects
 
@@ -65,7 +65,7 @@ and _texpr =
   | TEReturn of texpr
   | TEIf_then_else of texpr *  texpr * texpr
   | TEBlock of tblock
-  | TEFn of funbody
+  | TEFn of tfunbody
   | TECall of texpr * texpr list 
 and texpr = {
   texpr: _texpr;

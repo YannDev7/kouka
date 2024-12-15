@@ -17,22 +17,27 @@ let rec head = function
   | TVar { def = Some t }, eff -> head t
   | t -> t
 
-let rec cannon tb = match head tb with
-  | TVar t, eff -> (TVar t, eff)
-  | TUnit, eff | TInt, eff | TBool, eff | TString, eff -> tb
+let rec cannon ty = match ty with
+  | TVar { def = Some t }, eff -> cannon t
+  | TUnit, eff | TInt, eff | TBool, eff | TString, eff -> ty
   | TList t, eff -> (TList (cannon t), eff)
   | TFun (args, ret), eff ->
     (* be careful of args order *)
     (TFun (
-      List.rev (List.fold_left (fun acc a -> cannon a::acc) args []),
+      (* fun bug, if we switch args and [] it is still well typed lol... *)
+      List.rev (List.fold_left (fun acc a -> (cannon a)::acc) [] args),
       cannon ret
     ), eff)
   | TMaybe t, eff -> (TMaybe (cannon t), eff)
+  | t -> t
 
 let head_typ t = fst (head t)
-let head_eff t = 
-  snd t
-  (* snd (head t) *) (* todo: to update after 
+
+let rec head_teff = function
+  | TEff { edef = Some te } -> head_teff te
+  | te -> te
+let head_eff t = (* head_teff (snd t) *)
+  snd (head t) (* todo: to update after 
                               having added teff *)
 
 let no_eff tv = (tv, ESet (Effset.empty))
@@ -40,14 +45,14 @@ let singleton_eff e = ESet (Effset.singleton e)
 
 (* todo: use some sort of head_eff when we add
 teff *)
-let has_eff_e e = function
+let has_eff_e e teff = match head_teff teff with
   | ESet s -> Effset.mem e s
   | _ -> failwith "raaah\n"
 
 let has_eff_t ef t = has_eff_e ef (head_eff t)
 
 let fresh_eff tv = 
-  (* (tv, TEff (VEff.create ())) *)
+  (*(tv, TEff (VEff.create ()))*)
   (tv, ESet Effset.empty)
 
 let eff_set_t t = match head_eff t with
@@ -64,6 +69,11 @@ let union_eff_t t1 t2 =
 
 let union_eff_e e1 e2 =
   ESet (Effset.union (eff_set_e e1) (eff_set_e e2))
+
+(* let union_eff_e e1 e2 = match head_teff e1, head_teff e2 with
+  | TEff te1, TEff te2 when te1.eid = te2.eid -> te1
+  | ESet s1, ESet s2 -> ESet (Effset.union s1 s2)
+  | ESet s1, TEff te2 -> *)
 
 let rec eff_from_str = function
   | [] -> ESet (Effset.empty)
@@ -94,8 +104,8 @@ let rec unify pos t1 t2 = match head t1, head t2 with
   | (t1, e1), (TVar tv2, e2) -> 
     if occur tv2 (t1, e1) then raise (Error (pos, "unify: cycle"));
     tv2.def <- Some (t1, e1)
-  | (t1, e1), (t2, e2) when t1 = t2 ->
-    unify_eff pos e1 e2;
+  | (t1, e1), (t2, e2) when t1 = t2 -> ()
+    (*unify_eff pos e1 e2;*)
     (* if e1 <> e2 then raise (Error (pos, "unify: effects skill issue")); *) (* x doubt *)
   | (TList t1, e1), (TList t2, e2) ->
     unify pos t1 t2;
@@ -103,10 +113,14 @@ let rec unify pos t1 t2 = match head t1, head t2 with
   | (TFun (args1, res1), e1), (TFun (args2, res2), e2) ->
     List.iter (fun (a1, a2) -> unify pos a1 a2) 
               (List.combine args1 args2);
-    unify_eff pos e1 e2;
+    fpp_typ t1;
+    fpp_typ t2;
+    fpp_typ res1;
+    fpp_typ res2;
+    unify_eff pos (head_eff res1) (head_eff res2);
     unify pos res1 res2;
   | (TMaybe t1, e1), (TMaybe t2, e2) ->
-    if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));
+    (*if e1 <> e2 then raise (Error (pos, "unify: effects skill issue"));*) (* x doubt *)
     unify pos t1 t2
   | _, _ -> raise (Error (pos, "unify: error"))
 
@@ -122,11 +136,23 @@ let get_call_id e = match e.expr with
     end
   | _ -> None
 
+let get_epsilon e = 
+  let () = ignore(e.texpr) in
+  match head e.typ with 
+    | TFun (args, res), eff ->
+      head_eff res (* x doubt ? todo: infer effects... *)
+    | _ -> ESet Effset.empty
+    (* type validity is checked later... *) 
+
 let rec kwutype_to_typ t = match t.kwutype with
   | KUnit -> no_eff TUnit
   | KType (id, dep) ->
     begin
       match id with
+        | "unit" -> 
+          if dep.kwutype <> KUnit then 
+            raise (Error ((dummy_pos, dummy_pos), "unit<*> is invalid."));
+          no_eff TUnit
         | "int" ->
           if dep.kwutype <> KUnit then 
             raise (Error ((dummy_pos, dummy_pos), "int<*> is invalid."));
@@ -140,6 +166,7 @@ let rec kwutype_to_typ t = match t.kwutype with
             raise (Error ((dummy_pos, dummy_pos), "bool<*> is invalid."));
           no_eff TBool
         | "list" ->
+          (* by default, list means list<unit>*)
           no_eff (TList (kwutype_to_typ dep))
         | _ -> raise (Error ((dummy_pos, dummy_pos), "unknown constructor for ktype."))
     end
@@ -154,11 +181,22 @@ let rec kwutype_to_typ t = match t.kwutype with
     let eff, res = res.result in
     let tres = kwutype_to_typ res in
     let teff = eff_from_str eff in
-    (TFun (t_args, tres), teff)
+    (TFun (t_args, (fst tres, union_eff_e (snd tres) teff)), teff)
 
 let constraints = ref []
-let cur_id = ref ""
-let cur_res = ref (no_eff TUnit)
+
+let cnt_ano = ref 0
+
+let b_id = ""
+let b_res = ref (no_eff TUnit)
+
+let cur_ids = Stack.create ()
+let cur_ress = Stack.create ()
+
+let () =
+  Stack.push b_id cur_ids;
+  Stack.push b_res cur_ress
+
 let divg = ref Idmap.empty
 let defs = ref Idmap.empty
 
@@ -174,7 +212,7 @@ let rec type_const env const = match const.const with
         begin
           let ans = { tconst = TCVar id; typ = Idmap.find id env.types } in
           (* add div effect *)
-          if id = !cur_id then divg := Idmap.add id true !divg;
+          if id = Stack.top cur_ids then divg := Idmap.add id true !divg;
           ans
         end
       with
@@ -287,11 +325,11 @@ and type_expr env exp = match exp.expr with
     if not (Idmap.mem id env.vars) then
       raise (Error (exp.pos, id ^ " is not mutable."));
 
-    { texpr = TEUpdate (id, te); typ = te.typ }
+    { texpr = TEUpdate (id, te); typ = (TUnit, snd te.typ) }
   | EReturn e ->
     let te = type_expr env e in
     (* do we unify the return values too ? *)
-    unify exp.pos !cur_res te.typ;
+    unify exp.pos !(Stack.top cur_ress) te.typ;
     { texpr = TEReturn te;
       typ = (TVar (V.create ())), snd te.typ } (* todo: in the end, unify
                                                       with types of all the return *)
@@ -322,7 +360,7 @@ and type_expr env exp = match exp.expr with
       { texpr = TEList tls; typ = (TList (List.hd tls).typ, eff) }
     end
   | ECall (e, args) ->
-    let pre_def = ["println"; "repeat"] in
+    let pre_def = ["println"; "repeat"; "while"; "for"] in
     begin
       match get_call_id e with
         | Some id when List.mem id pre_def ->
@@ -364,16 +402,12 @@ and type_expr env exp = match exp.expr with
                             ::!constraints;
                 
                 let te2 = type_expr env (List.nth args 1) in
-                constraints := ([TFun ([no_eff TUnit], no_eff TInt)], te1.typ,
-                                Error (exp.pos, "repeat requires () -> int as
-                                                  second argument."))
+                constraints := ([TFun ([], no_eff TUnit)], te2.typ,
+                                Error (exp.pos, "repeat requires () -> () as
+                                                 second argument."))
                             ::!constraints;
-                let eps = (match head te1.typ with 
-                            | TFun (args, res), eff ->
-                              head_eff res (* x doubt ? *)
-                            | _ -> ESet Effset.empty)
-                            (* type validity is checked later... *)
-                          in
+
+                let eps = get_epsilon te2 in
 
                 let repeat_t = (TFun ([te1.typ; te2.typ], (TUnit, ESet Effset.empty)),
                                ESet Effset.empty) in
@@ -388,14 +422,87 @@ and type_expr env exp = match exp.expr with
                             typ = (TUnit, ueff)
                           }, [te1; te2]);
                   typ = (TUnit, ueff) }
+              | "while" ->
+                if List.length args <> 2 then
+                  raise (Error (exp.pos, "while requires two arguments."));
+
+                let te1 = type_expr env (List.hd args) in
+                constraints := ([TFun ([], no_eff TBool)], te1.typ,
+                                Error (exp.pos, "repeat requires () -> bool as
+                                                  first argument."))
+                            ::!constraints;
+                
+                let te2 = type_expr env (List.nth args 1) in
+                constraints := ([TFun ([], no_eff TUnit)], te2.typ,
+                                Error (exp.pos, "while requires () -> () as
+                                                  second argument."))
+                            ::!constraints;
+                
+                let eps3 = get_epsilon te1 in
+                let eps4 = get_epsilon te2 in
+
+                let while_t = (TFun ([te1.typ; te2.typ], (TUnit, singleton_eff Div)),
+                                ESet Effset.empty) in
+                let ueff = union_eff_e (head_eff te1.typ) 
+                                        (union_eff_e (head_eff te2.typ)
+                                                      (union_eff_e eps3
+                                                                   (union_eff_e eps4
+                                                                                (singleton_eff Div)))) in
+                { texpr = TECall ({
+                            texpr = TECst {
+                              tconst = TCVar "while";
+                              typ = while_t
+                            };
+                            typ = (TUnit, ueff)
+                          }, [te1; te2]);
+                  typ = (TUnit, ueff) }
+              | "for" ->
+                if List.length args <> 3 then
+                  raise (Error (exp.pos, "for requires two arguments."));
+
+                let te1 = type_expr env (List.hd args) in
+                constraints := ([TInt], te1.typ,
+                                Error (exp.pos, "for requires int as
+                                                  first argument."))
+                            ::!constraints;
+                
+                let te2 = type_expr env (List.nth args 1) in
+                constraints := ([TInt], te2.typ,
+                                Error (exp.pos, "for requires int as
+                                                  second argument."))
+                            ::!constraints;
+
+                let te3 = type_expr env (List.nth args 2) in
+                constraints := ([TFun ([no_eff TInt], no_eff TUnit)], te3.typ,
+                                Error (exp.pos, "for requires (int) -> () as
+                                                  third argument."))
+                            ::!constraints;
+                
+                let eps = get_epsilon te3 in
+
+                let for_t = (TFun ([te1.typ; te2.typ; te3.typ], (TUnit, ESet Effset.empty)),
+                                ESet Effset.empty) in
+                let ueff = union_eff_e (head_eff te1.typ) 
+                                        (union_eff_e (head_eff te2.typ)
+                                                      (union_eff_e
+                                                                  (head_eff te3.typ)
+                                                                   eps)) in
+                { texpr = TECall ({
+                            texpr = TECst {
+                              tconst = TCVar "for";
+                              typ = for_t
+                            };
+                            typ = (TUnit, ueff)
+                          }, [te1; te2; te3]);
+                  typ = (TUnit, ueff) }
               | _ -> failwith "todo\n"
           end
         | Some id ->
           (try
             let ft = Idmap.find id env.types in
-            if id = !cur_id then divg := Idmap.add id true !divg;
+            if id = Stack.top cur_ids then divg := Idmap.add id true !divg;
             begin
-              match ft with
+              match head ft with
                 | TFun (targs, res), eff ->
                   let t_args = List.map (type_expr env) args in
                   List.iter (
@@ -429,6 +536,25 @@ and type_expr env exp = match exp.expr with
           pp_expr Format.std_formatter e;
           raise (Error (exp.pos, "uncallable object was called"));
     end;
+  | EFn cbody ->
+    (* todo:handle div effect when def f: fn () {f()}
+            handle ff effect vs user effects 
+             currently assume ff *)
+    let new_name = "-ano" ^ (string_of_int !cnt_ano) in
+    incr cnt_ano;
+
+    let decl = {
+      decl = {
+        name = new_name;
+        body = cbody
+      };
+      pos = exp.pos
+    } in 
+    let t_decl = type_decl env decl in
+    {
+      texpr = TEFn t_decl.tdecl.tbody;
+      typ = no_eff (fst t_decl.typ)
+    }
   | _ -> failwith "todooo\n"
 
 and type_block env bl =
@@ -480,7 +606,8 @@ and type_decl env od =
   let d = od.decl in
   let body = d.body in
   let b = body.funbody in
-  cur_id := d.name;
+  
+  Stack.push d.name cur_ids;
   Printf.printf "adding %s\n" d.name;
 
   if Idmap.mem d.name !defs then
@@ -504,77 +631,104 @@ and type_decl env od =
   let id_t_ls = List.rev id_rt_ls in
   let t_ls = List.map (fun (a, b) -> b) id_t_ls in
   let eff, res = b.tag.result in
-  let t_res = fresh_eff (TVar (V.create ())) in
+  let t_res = ref (fresh_eff (TVar (V.create ()))) in
 
   (* ff is banned in effects *)
-  if eff <> ["ff"] then
-    unify body.pos t_res (kwutype_to_typ res);
+  if eff <> ["ff"] then begin
+    Printf.printf "using user sig for %s\n" d.name;
+    unify body.pos !t_res (kwutype_to_typ res);
+    t_res := (fst !t_res, eff_from_str eff);
+  end;
   
-  cur_res := t_res;
+  Stack.push t_res cur_ress;
   
-  let t_decl = (TFun (t_ls, t_res),
+  let t_decl = (TFun (t_ls, !t_res),
                 if eff <> ["ff"] then eff_from_str eff
                 else ESet Effset.empty) in
-                
+
   let new_env = List.fold_left (
     fun cur_env (id, t) ->
       { cur_env with types = Idmap.add id t cur_env.types}
-  ) !env ((d.name, t_decl)::id_t_ls) in
+  ) env ((d.name, t_decl)::id_t_ls) in
 
   Printf.printf "added %s\n" d.name;
+  fpp_typ t_decl;
   let tb = type_body new_env body in
-  (* unify body.pos t_res tb.typ; *) (* x doubt *)
+
+  Printf.printf "BEGIN tyty %s\n" d.name;
+  fpp_typ !t_res;
+  fpp_typ tb.typ;
+  unify body.pos !t_res tb.typ; (* x doubt *)
+
+  fpp_typ !t_res;
+  fpp_typ (cannon t_decl);
+  Printf.printf "END tyty %s\n" d.name;
 
   (* we shout if the usr didn't add the div effect
     but he is allowed to add console and div even if useless *)
   if eff <> ["ff"] &&
-    Idmap.mem !cur_id !divg && 
+    (Idmap.mem d.name !divg || has_eff_t Div tb.typ) && 
     not (List.mem "div" eff) then 
-      raise (Error (od.pos, "function " ^ !cur_id ^ " should have effect div."));
+      raise (Error (od.pos, "function " ^ d.name ^ " should have effect div."));
 
   if eff <> ["ff"] &&
     (has_eff_t Console tb.typ)
     && not (List.mem "console" eff) then 
-      raise (Error (od.pos, "function " ^ !cur_id ^ " should have effect console."));
+      raise (Error (od.pos, "function " ^ d.name ^ " should have effect console."));
 
   (* check if args have distinct names *)
   let seen = ref Idmap.empty in
   List.iter (
     fun (id, kt) ->
       if Idmap.mem id !seen then
-        raise (Error (od.pos, "function " ^ !cur_id ^ " should have
+        raise (Error (od.pos, "function " ^ d.name ^ " should have
                               distinct arguments names but " ^ id ^ " has
                               multiple occurences."));
       seen := Idmap.add id true !seen;
   ) b.args;
   
   let inf_eff =
-    if Idmap.mem !cur_id !divg then
+    if Idmap.mem d.name !divg then
       union_eff_e (head_eff tb.typ) (singleton_eff Div)
     else
       head_eff tb.typ in
 
   let tfun = if eff <> ["ff"] then t_decl else (fst t_decl, inf_eff) in
-  env := { !env with types = Idmap.add !cur_id tfun !env.types };
 
   if has_eff_t Console tfun then Printf.printf "concon\n";
   if has_eff_t Div tfun then Printf.printf "didi\n";
+  
+  ignore(Stack.pop cur_ids);
+  ignore(Stack.pop cur_ress);
+
   { tdecl = { name = d.name; tbody = tb }; typ = tfun }
 
 and type_file file =
+  (*fpp_typ (cannon (no_eff (TFun ([no_eff 
+    (TVar ({ id = 1; def = Some (no_eff TInt) }))], 
+  (TInt, singleton_eff Div)))));*)
+
   let env = ref { types = Idmap.empty; vars = Idmap.empty} in
   let rec aux = function
     | [] -> []
-    | hd::tl -> let nh = (type_decl env hd) (* otherwise, wrong order *)
-                in nh::aux tl
+    | hd::tl -> let nh = (type_decl !env hd) in (* otherwise, wrong order *)
+                env := { !env with types = Idmap.add hd.decl.name nh.typ !env.types };
+                nh::aux tl
   in
   let ast = aux file in
   List.iter (
     fun (cons, t, err) ->
+      (*pp_typ Format.std_formatter t;*)
       begin
-        match head_typ t with
-          | TFun ([(TUnit, _)], (TInt, _)) ->
-            if not (List.mem (TFun ([no_eff TUnit], no_eff TInt)) cons) then
+        match head_typ (cannon t) with
+          | TFun ([], (TUnit, _)) ->
+            if not (List.mem (TFun ([], no_eff TUnit)) cons) then
+              raise err;
+          | TFun ([], (TBool, _)) ->
+            if not (List.mem (TFun ([], no_eff TBool)) cons) then
+              raise err;
+          | TFun([TInt, _], (TUnit, _)) ->
+            if not (List.mem (TFun ([no_eff TInt], no_eff TUnit)) cons) then
               raise err;
           | TList tau ->
             if not (List.mem (TList (TUnit, ESet Effset.empty)) cons) then

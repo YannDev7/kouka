@@ -2,6 +2,7 @@ open Lexing
 open Parser
 open Format
 open Ast
+open Typed_ast
 
 let pp_lexbuf lb =
   let pos = lb.lex_curr_pos in
@@ -77,3 +78,34 @@ let pp_tok fmt = function
   | UPDATE -> fprintf fmt ":=\n";
   | EOF -> fprintf fmt "\neof\n";
   | _ -> fprintf fmt "? "
+
+let rec pp_eff fmt = function
+  | ESet s -> Effset.iter (fun x -> if x = Div then
+                                      fprintf fmt "Div,"
+                                    else 
+                                      fprintf fmt "Console,")
+                          s
+  | TEff te -> 
+    (match te.edef with
+      | None -> fprintf fmt "t_eff"
+      | Some t -> fprintf fmt "te=>(%a)" pp_eff t)
+  | _ -> failwith "teff not supported yet.\n"
+
+let rec pp_typ_val fmt = function
+  | TUnit -> fprintf fmt "UNIT"
+  | TInt -> fprintf fmt "int"
+  | TBool -> fprintf fmt "bool"
+  | TString -> fprintf fmt "string"
+  | TList t -> fprintf fmt "list<%a>" pp_typ t
+  | TFun (ls, res) ->
+    fprintf fmt "fun (%a) -> %a" (pp_list pp_typ) ls pp_typ res
+  | TMaybe t -> fprintf fmt "maybe<%a>" pp_typ t
+  | TVar tv ->
+    (match tv.def with
+      | None -> fprintf fmt "t_var"
+      | Some t -> fprintf fmt "tv=>(%a)" pp_typ t)
+and pp_typ fmt t =
+  fprintf fmt "(%a, <%a>)" pp_typ_val (fst t) pp_eff (snd t)
+ 
+let fpp_typ t =
+  fprintf (Format.std_formatter) "%a\n" pp_typ t

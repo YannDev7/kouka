@@ -130,9 +130,16 @@ we make common prefix in same rule
 
 typ:
 | t = atyp { t }
+(*| LPAR RPAR ARROW res_t = result { { kwutype = KFun ([], res_t);
+                                         pos = ($startpos, $endpos) } }*)
 | LPAR t = typ RPAR { t } 
-| args_t = atyp ARROW res_t = result { { kwutype = KFun ([args_t], res_t);
-                                         pos = ($startpos, $endpos) } }
+| args_t = atyp ARROW res_t = result {
+   (* fixing reading f: () -> int *)
+   let ls = if args_t.kwutype = KUnit then []
+            else [args_t] in
+   { kwutype = KFun (ls, res_t);
+     pos = ($startpos, $endpos) }
+}
 | LPAR t1 = typ RPAR ARROW res_t = result { { kwutype = KFun ([t1], res_t);
                                             pos = ($startpos, $endpos) } }
 | LPAR t1 = typ COMMA args_t = separated_nonempty_list(COMMA, typ) 
@@ -232,7 +239,7 @@ atom:
               args@[{expr=EFn ({funbody={
                                 args = [];
                                 tag = {
-                                  result=([],
+                                  result=(["ff"],
                                           {kwutype = KUnit;
                                           pos = ($startpos, $endpos)});
                                   pos = ($startpos, $endpos)};
