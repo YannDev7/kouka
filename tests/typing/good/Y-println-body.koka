@@ -1,0 +1,4 @@
+fun main(): <div> int {
+    fn () { println(42); };
+    2;
+}

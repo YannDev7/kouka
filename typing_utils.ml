@@ -175,7 +175,8 @@ let get_epsilon e =
   let () = ignore(e.texpr) in
   match head e.typ with 
     | TFun (args, res), eff ->
-      head_eff res (* x doubt ? todo: infer effects... *)
+      head_eff (head res) (* x doubt ? todo: infer effects... *)
+      (* remove the "head res" if problems *)
     | _ -> ESet Effset.empty
     (* type validity is checked later... *) 
 

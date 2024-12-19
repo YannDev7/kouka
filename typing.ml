@@ -267,6 +267,7 @@ and type_expr env exp = match exp.expr with
 
                 let while_t = (TFun ([te1.typ; te2.typ], (TUnit, singleton_eff Div)),
                                 ESet Effset.empty) in
+                
                 let ueff = union_eff_e (head_eff te1.typ) 
                                         (union_eff_e (head_eff te2.typ)
                                                       (union_eff_e eps3
