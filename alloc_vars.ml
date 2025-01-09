@@ -1,0 +1,63 @@
+(* phase 1 : allocation des variables *)
+open Alloc_ast
+open Typed_ast
+
+module Idmap = Map.Make(String)
+
+type alloc_env = int Idmap.t
+
+let rec alloc_const fpcur env c = 
+  ignore(c.tconst);
+  let wrap_const _const =
+    { aconst = _const; typ = c.typ } in
+  match c.tconst with
+    | TCUnit -> wrap_const ACUnit
+    | TCBool b -> wrap_const (ACBool b)
+    | TCInt i -> wrap_const (ACInt i)
+    | TCString s -> wrap_const (ACString s)
+    | TCVar id -> wrap_const (ACVar (Vlocal (Idmap.find id env)))
+
+and alloc_expr fpcur env c =
+  ignore(c.texpr);
+  let wrap_expr _expr =
+    { aexpr = _expr; typ = c.typ } in
+  match c.texpr with
+    | TECst c -> wrap_expr (AECst (alloc_const fpcur env c))
+    | TEList ls ->
+      wrap_expr (AEList (
+                  List.rev(
+                    List.fold_left (fun acc e -> 
+                                    (alloc_expr fpcur env e)::acc) 
+                                  [] ls
+                  )
+                ))
+    | TEBinop (op, a, b) ->
+      wrap_expr (AEBinop (op, alloc_expr fpcur env a,
+                              alloc_expr fpcur env b))
+    | TEUpdate (id, e) ->
+      wrap_expr (AEUpdate (Idmap.find id env, alloc_expr fpcur env e))
+    | TEBlock b ->
+      wrap_expr (AEBlock (alloc_block fpcur env b))
+    | _ -> failwith "todo"
+
+and alloc_block fpcur env c =
+  let wrap_block _block =
+    { ablock = _block; typ = c.typ } in 
+  let _block =
+    let rec aux cc = match cc.tblock with
+      | [] -> []
+      | hd::tl -> (alloc_stmt fpcur env hd)::(aux tl)
+    in aux c
+  in wrap_block _block
+      
+and alloc_stmt fpcur env c =
+  let wrap_stmt _stmt =
+    { astmt = _stmt; typ = c.typ } in 
+  match c.tstmt with
+    | TSExpr e -> wrap_stmt (alloc_expr fpcur env e)
+    | TSAssign (id, e) ->
+      let new_env = Idmap.add id (fpcur - 8) env in
+      wrap_stmt (alloc_expr (fpcur - 8) new_env e)
+    | TSUpdate (id, e) ->
+      let new_env = Idmap.add id (fpcur - 8) env in
+      wrap_stmt (alloc_expr (fpcur - 8) new_env e)
