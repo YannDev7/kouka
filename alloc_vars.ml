@@ -4,7 +4,10 @@ open Typed_ast
 
 module Idmap = Map.Make(String)
 
-type alloc_env = int Idmap.t
+type alloc_env = {
+  local_env: int Idmap.t;
+  clos_env: int Idmap.t
+}
 
 let rec alloc_const fpcur env c = 
   ignore(c.tconst);
@@ -44,20 +47,49 @@ and alloc_block fpcur env c =
   let wrap_block _block =
     { ablock = _block; typ = c.typ } in 
   let _block =
-    let rec aux cc = match cc.tblock with
+    let rec aux cc = match cc with
       | [] -> []
       | hd::tl -> (alloc_stmt fpcur env hd)::(aux tl)
-    in aux c
+    in aux c.tblock
   in wrap_block _block
       
 and alloc_stmt fpcur env c =
   let wrap_stmt _stmt =
     { astmt = _stmt; typ = c.typ } in 
   match c.tstmt with
-    | TSExpr e -> wrap_stmt (alloc_expr fpcur env e)
+    | TSExpr e -> wrap_stmt (ASExpr (alloc_expr fpcur env e))
     | TSAssign (id, e) ->
       let new_env = Idmap.add id (fpcur - 8) env in
-      wrap_stmt (alloc_expr (fpcur - 8) new_env e)
+      wrap_stmt (ASAssign (fpcur - 8,
+                          alloc_expr (fpcur - 8) new_env e))
     | TSUpdate (id, e) ->
       let new_env = Idmap.add id (fpcur - 8) env in
-      wrap_stmt (alloc_expr (fpcur - 8) new_env e)
+      wrap_stmt (ASUpdate (fpcur - 8,
+                          alloc_expr (fpcur - 8) new_env e))
+and alloc_body fpcur env (c: tfunbody) =
+  let wrap_body _body =
+    { abody = _body; typ = c.typ } in 
+  
+  let new_env, delta = List.fold_left
+                  (fun (acc, delta) id ->
+                    (Idmap.add id (fpcur + delta) acc, delta - 8))
+                  (env, -8)
+                  c.tbody.args in
+  let _content = alloc_expr (fpcur + delta) new_env 
+                            c.tbody.tcontent in
+  let _body = { acontent = _content; args = c.tbody.args } in
+  wrap_body _body
+
+and alloc_decl fpcur env c =
+  let wrap_decl _decl =
+    { adecl = _decl; typ = c.typ } in
+  let _body = alloc_body fpcur env c.tdecl.tbody in
+  let _decl = { abody = _body; name = c.tdecl.name } in
+  wrap_decl _decl
+
+and alloc_file ls =
+  List.rev(
+    List.fold_left
+      (fun acc decl -> (alloc_decl 0 (Idmap.empty) decl)::acc)
+      [] ls
+  )

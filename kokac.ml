@@ -7,6 +7,7 @@ open Lexer
 open Exception
 open Pp
 open Typing
+open Alloc_vars
 
 let usage = "usage: koka [options] file.koka"
 

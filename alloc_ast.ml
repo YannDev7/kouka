@@ -30,8 +30,8 @@ and _aexpr =
   | AEUpdate of int * aexpr
   | AEReturn of aexpr
   | AEIf_then_else of aexpr *  aexpr * aexpr
-  | AEBlock of tblock
-  | AEClos of tfunbody
+  | AEBlock of ablock
+  | AEClos of afunbody
   | AECall of aexpr * aexpr list
 and aexpr = {
   aexpr: _aexpr;
