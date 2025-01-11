@@ -11,4 +11,8 @@ clean:
 	rm -rf ./_build
 	rm -rf kokak.exe
 
+temp_test: kokac.exe
+	dune exec ./kokac.exe temp_test.koka
+	
+
 .PHONY: koka test1 test2

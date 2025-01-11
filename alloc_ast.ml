@@ -10,7 +10,11 @@ type _aconst =
   | ACVar of avar
 
   | APrintInt
-  | ACallPrintInt of int
+  | ACallPrintInt of int (* TODO ajouter les autres print *)
+  | APrintBool
+  | ACallPrintBool of bool
+  | APrintString
+  | ACallPrintString of string
 and avar =
   | Vlocal of int
   | Vglobal of ident

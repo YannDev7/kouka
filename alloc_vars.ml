@@ -41,6 +41,24 @@ and alloc_expr fpcur env c =
       wrap_expr (AEUpdate (Idmap.find id env, alloc_expr fpcur env e))
     | TEBlock b ->
       wrap_expr (AEBlock (alloc_block fpcur env b))
+    | TECall (f, exp_list) ->
+      (match tget_call_id with 
+      | Some s when s = TCVar "println" ->
+        (match exp_list with
+          | e::[] ->
+            (match e.typ with
+              | TInt,_ -> 
+                let n = get_value_cst e in
+                wrap_expr (AECst (ACallPrintInt n))
+              | TBool,_ ->
+                let b = get_value_cst e in
+                wrap_expr (AECst (ACallPrintBool b))
+              | TString,_ ->
+                wrap_expr (AECst (ACallPrintString))
+              | _ -> failwith "wrong type in println")
+          | _ -> failwith "wrong number of parameters for println")
+      | Some s -> failwith "youpi"
+      | None -> failwith "faire l'erreur")
     | _ -> failwith "todo"
 
 and alloc_block fpcur env c =
