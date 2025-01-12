@@ -9,8 +9,8 @@ type _aconst =
   | ACString of string
   | ACVar of avar
 
-  | APrintInt
-  | ACallPrintInt of int (* TODO ajouter les autres print *)
+  | APrintInt (* TODO ajouter les autres print *)
+  | ACallPrintInt of aexpr (* TODO vérifier que c'est bien aexpr *)
   | ACallPrintIntImm of int
   | APrintBool
   | ACallPrintBool of bool

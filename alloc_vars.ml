@@ -51,19 +51,22 @@ and alloc_expr fpcur env c =
           match exp_list with
             | e::[] ->
               begin
-              match get_value_cst e with
+              match e.texpr with
               (* En fonction du type du paramètre, on n'appelle pas 
               la même fonction print *)
-                | TCInt n ->
+                | TECst c ->
+                  wrap_expr (compute_const c)
+                | TEBinop (op, a, b) ->
+                  let computed_binop = alloc_expr fpcur env e in
                   wrap_expr (AECst {
-                    aconst = ACallPrintInt n;
+                    aconst = ACallPrintInt (computed_binop);
                     typ = (TUnit, singleton_eff Div)
                   })
                 | _ -> failwith "to do"
               end
             | _ -> failwith "wrong number of parameters for println"
           end
-        | Some s -> failwith "youpi" 
+        | Some s -> failwith "les autres fonctions ne sont pas encore implémentées" 
         | None -> failwith "faire l'erreur"
       end
     | _ -> failwith "todo"

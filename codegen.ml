@@ -10,20 +10,42 @@ open Format
 let popn n = addq (imm n) !%rsp
 let pushn n = subq (imm n) !%rsp
 
-let compile_cst c = match c.aconst with
-  | ACallPrintInt n ->
+let rec compile_cst c = match c.aconst with
+  | ACInt n ->
+    pushq (imm n) 
+  | ACallPrintIntImm n ->
     (* cas où on appelle println sur un entier *)
     pushq (imm n) ++
     popq rdi ++
     call "print_int"
+  | ACallPrintInt e ->
+    begin
+      match e.aexpr with
+        | AEBinop (op, a, b) ->
+          compile_expr a ++
+          compile_expr b ++
+          popq rbx ++
+          popq rax ++
+          (match op with
+            | Add -> addq !%rbx !%rax ++ pushq !%rax
+            | Mul -> imulq !%rbx !%rax ++ pushq !%rax
+            | Sub -> subq !%rbx !%rax ++ pushq !%rax
+            | Div -> cqto ++ idivq !%rbx ++ pushq !%rax
+            | Mod -> cqto ++ idivq !%rbx ++ pushq !%rdx
+            | _ -> failwith "to do")
+        | _ -> failwith "to do"
+    end ++
+    popq rdi ++
+    call "print_int"
   | _ -> failwith "to do"
 
-let rec compile_expr e = match e.aexpr with
+and compile_expr e = match e.aexpr with
   | AECst c -> 
     compile_cst c
   | AEBlock b ->
+    (* TODO : check le list.rev, sans ça traite dans le mauvais sens *)
     List.fold_left (fun code s -> let codefun,codemain = compile_stmt (code, nop) s in
-                                  codefun) nop b.ablock;
+                                  codefun) nop (List.rev b.ablock);
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with
