@@ -13,9 +13,11 @@ type _aconst =
   | ACallPrintInt of aexpr (* TODO vérifier que c'est bien aexpr *)
   | ACallPrintIntImm of int
   | APrintBool
-  | ACallPrintBool of bool
+  | ACallPrintBool of aexpr
+  | ACallPrintBoolImm of bool
   | APrintString
-  | ACallPrintString of string
+  | ACallPrintString of aexpr
+  | ACallPrintStringImm of string
 and avar =
   | Vlocal of int
   | Vglobal of ident

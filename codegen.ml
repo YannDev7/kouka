@@ -4,6 +4,7 @@ open X86_64
 open Typing_utils
 open Alloc_ast
 open Format
+open Codegen_utils
 
 (* Production de code *)
 
@@ -13,6 +14,14 @@ let pushn n = subq (imm n) !%rsp
 let rec compile_cst c = match c.aconst with
   | ACInt n ->
     pushq (imm n) 
+  | ACBool b ->
+    pushq (imm (int_of_bool b))
+  | ACString s ->
+    let code = ref (pushq (imm 0)) in
+    for i = 0 to (String.length s - 1) do
+      code := !code ++ pushq (imm (c_to_int (s.[i])))
+    done;
+    !code
   | ACallPrintIntImm n ->
     (* cas où on appelle println sur un entier *)
     pushq (imm n) ++
@@ -22,6 +31,24 @@ let rec compile_cst c = match c.aconst with
     compile_expr e ++
     popq rdi ++
     call "print_int"
+  | ACallPrintBoolImm b ->
+    let int_of_b = int_of_bool b in
+    pushq (imm int_of_b) ++
+    popq rdi ++
+    call "print_int"
+  | ACallPrintBool e ->
+    compile_expr e ++
+    popq rdi ++
+    call "print_int"
+  | ACallPrintStringImm s ->
+    (* to do : à refaire entièrment *)
+    pushq (imm 0) ++
+    popq rdi ++ 
+    call "print_string"
+  | ACallPrintString e ->
+    compile_expr e ++
+    popq rdi ++
+    call "print_string"
   | _ -> failwith "to do"
 
 and compile_expr e = match e.aexpr with
@@ -42,7 +69,24 @@ and compile_expr e = match e.aexpr with
       | Sub -> subq !%rbx !%rax ++ pushq !%rax
       | Div -> cqto ++ idivq !%rbx ++ pushq !%rax
       | Mod -> cqto ++ idivq !%rbx ++ pushq !%rdx
-      | _ -> failwith "to do")
+      | And -> andq !%rbx !%rax ++ pushq !%rax
+      | Or  -> orq !%rbx !%rax ++ pushq !%rax
+      | Eq  -> 
+        (* todo : comprendre comment fonctionnent les flags*)
+        nop
+      | Neq ->
+        nop
+      | Lt ->
+        nop
+      | Leq ->
+        nop
+      | Gt ->
+        nop
+      | Geq ->
+        nop
+      | Pplus ->
+        (* todo : concaténation chaîne de caractères *)
+        nop)
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with
@@ -79,12 +123,19 @@ let compile_program p ofile =
         label "print_int" ++
         movq !%rdi !%rsi ++
         movq (ilab ".Sprint_int") !%rdi ++
+        movq (imm 0) !%rax ++ (* todo : vérifier l'alignement de la pile *)
+        call "printf" ++
+        ret ++
+        label "print_string" ++
+        movq !%rdi !%rsi ++
+        movq (ilab "message") !%rdi ++
         movq (imm 0) !%rax ++
         call "printf" ++
         ret ++
         codefun;
       data =
-      (label ".Sprint_int" ++ string "%d\n")
+      (label ".Sprint_int" ++ string "%d\n" ++
+       label "message" ++ string "%s\n")
     }
   in
   let f = open_out ofile in

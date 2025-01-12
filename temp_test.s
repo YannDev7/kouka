@@ -2,83 +2,15 @@
 	.globl	main
 main:
 	movq %rsp, %rbp
-	pushq $100
-	pushq $4
-	popq %rbx
-	popq %rax
-	addq %rbx, %rax
-	pushq %rax
+	pushq $9
 	popq %rdi
-	call print_int
-	pushq $102
-	pushq $1
-	popq %rbx
-	popq %rax
-	subq %rbx, %rax
-	pushq %rax
+	call print_string
+	pushq $21
 	popq %rdi
-	call print_int
-	pushq $100
-	pushq $2
-	pushq $4
-	popq %rbx
-	popq %rax
-	imulq %rbx, %rax
-	pushq %rax
-	popq %rbx
-	popq %rax
-	addq %rbx, %rax
-	pushq %rax
+	call print_string
+	pushq $15
 	popq %rdi
-	call print_int
-	pushq $216
-	pushq $2
-	popq %rbx
-	popq %rax
-	cqto
-	idivq %rbx
-	pushq %rax
-	popq %rdi
-	call print_int
-	pushq $3
-	pushq $37
-	popq %rbx
-	popq %rax
-	imulq %rbx, %rax
-	pushq %rax
-	popq %rdi
-	call print_int
-	pushq $32
-	popq %rdi
-	call print_int
-	pushq $118
-	pushq $1
-	pushq $2
-	popq %rbx
-	popq %rax
-	cqto
-	idivq %rbx
-	pushq %rdx
-	popq %rbx
-	popq %rax
-	addq %rbx, %rax
-	pushq %rax
-	popq %rdi
-	call print_int
-	pushq $100
-	pushq $143
-	pushq $12
-	popq %rbx
-	popq %rax
-	cqto
-	idivq %rbx
-	pushq %rdx
-	popq %rbx
-	popq %rax
-	addq %rbx, %rax
-	pushq %rax
-	popq %rdi
-	call print_int
+	call print_string
 	movq $0, %rax
 	ret
 print_int:
@@ -87,6 +19,14 @@ print_int:
 	movq $0, %rax
 	call printf
 	ret
+print_string:
+	movq %rdi, %rsi
+	movq $message, %rdi
+	movq $0, %rax
+	call printf
+	ret
 	.data
 .Sprint_int:
 	.string "%d\n"
+message:
+	.string "%s\n"
