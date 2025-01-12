@@ -11,6 +11,7 @@ type _aconst =
 
   | APrintInt
   | ACallPrintInt of int (* TODO ajouter les autres print *)
+  | ACallPrintIntImm of int
   | APrintBool
   | ACallPrintBool of bool
   | APrintString

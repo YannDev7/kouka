@@ -8,6 +8,7 @@ open Exception
 open Pp
 open Typing
 open Alloc_vars
+open Codegen
 
 let usage = "usage: koka [options] file.koka"
 
@@ -44,10 +45,14 @@ let () =
     (* pp_file Format.std_formatter _f; *)
     if !parse_only then exit 0;
     (*Interp.file f*)
-    
-    let () = ignore(Typing.type_file _f) in ();
+
+    let t_f = Typing.type_file _f in
 
     if !type_only then exit 0;
+
+    let file_s = Filename.chop_suffix file ".koka" ^ ".s" in
+    let () = compile_program t_f file_s in ();
+    exit 0
   with
     | Lexer.Lexing_error s ->
 	report (lexeme_start_p lb, lexeme_end_p lb);

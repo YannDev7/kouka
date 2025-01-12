@@ -13,6 +13,8 @@ clean:
 
 temp_test: kokac.exe
 	dune exec ./kokac.exe temp_test.koka
+	gcc -g -no-pie temp_test.s
+	./a.out
 	
 
 .PHONY: koka test1 test2

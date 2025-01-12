@@ -1,6 +1,8 @@
 (* phase 1 : allocation des variables *)
 open Alloc_ast
 open Typed_ast
+open Typing_utils
+open Codegen_utils
 
 module Idmap = Map.Make(String)
 
@@ -42,23 +44,28 @@ and alloc_expr fpcur env c =
     | TEBlock b ->
       wrap_expr (AEBlock (alloc_block fpcur env b))
     | TECall (f, exp_list) ->
-      (match tget_call_id with 
-      | Some s when s = TCVar "println" ->
-        (match exp_list with
-          | e::[] ->
-            (match e.typ with
-              | TInt,_ -> 
-                let n = get_value_cst e in
-                wrap_expr (AECst (ACallPrintInt n))
-              | TBool,_ ->
-                let b = get_value_cst e in
-                wrap_expr (AECst (ACallPrintBool b))
-              | TString,_ ->
-                wrap_expr (AECst (ACallPrintString))
-              | _ -> failwith "wrong type in println")
-          | _ -> failwith "wrong number of parameters for println")
-      | Some s -> failwith "youpi"
-      | None -> failwith "faire l'erreur")
+      begin
+        match tget_call_id f with 
+        | Some s when s = "println" ->
+          begin
+          match exp_list with
+            | e::[] ->
+              begin
+              match get_value_cst e with
+              (* En fonction du type du paramètre, on n'appelle pas 
+              la même fonction print *)
+                | TCInt n ->
+                  wrap_expr (AECst {
+                    aconst = ACallPrintInt n;
+                    typ = (TUnit, singleton_eff Div)
+                  })
+                | _ -> failwith "to do"
+              end
+            | _ -> failwith "wrong number of parameters for println"
+          end
+        | Some s -> failwith "youpi" 
+        | None -> failwith "faire l'erreur"
+      end
     | _ -> failwith "todo"
 
 and alloc_block fpcur env c =
