@@ -19,22 +19,7 @@ let rec compile_cst c = match c.aconst with
     popq rdi ++
     call "print_int"
   | ACallPrintInt e ->
-    begin
-      match e.aexpr with
-        | AEBinop (op, a, b) ->
-          compile_expr a ++
-          compile_expr b ++
-          popq rbx ++
-          popq rax ++
-          (match op with
-            | Add -> addq !%rbx !%rax ++ pushq !%rax
-            | Mul -> imulq !%rbx !%rax ++ pushq !%rax
-            | Sub -> subq !%rbx !%rax ++ pushq !%rax
-            | Div -> cqto ++ idivq !%rbx ++ pushq !%rax
-            | Mod -> cqto ++ idivq !%rbx ++ pushq !%rdx
-            | _ -> failwith "to do")
-        | _ -> failwith "to do"
-    end ++
+    compile_expr e ++
     popq rdi ++
     call "print_int"
   | _ -> failwith "to do"
@@ -46,6 +31,18 @@ and compile_expr e = match e.aexpr with
     (* TODO : check le list.rev, sans ça traite dans le mauvais sens *)
     List.fold_left (fun code s -> let codefun,codemain = compile_stmt (code, nop) s in
                                   codefun) nop (List.rev b.ablock);
+  | AEBinop (op, a, b) ->
+    compile_expr a ++
+    compile_expr b ++
+    popq rbx ++
+    popq rax ++
+    (match op with
+      | Add -> addq !%rbx !%rax ++ pushq !%rax
+      | Mul -> imulq !%rbx !%rax ++ pushq !%rax
+      | Sub -> subq !%rbx !%rax ++ pushq !%rax
+      | Div -> cqto ++ idivq !%rbx ++ pushq !%rax
+      | Mod -> cqto ++ idivq !%rbx ++ pushq !%rdx
+      | _ -> failwith "to do")
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with

@@ -18,6 +18,19 @@ main:
 	pushq %rax
 	popq %rdi
 	call print_int
+	pushq $100
+	pushq $2
+	pushq $4
+	popq %rbx
+	popq %rax
+	imulq %rbx, %rax
+	pushq %rax
+	popq %rbx
+	popq %rax
+	addq %rbx, %rax
+	pushq %rax
+	popq %rdi
+	call print_int
 	pushq $216
 	pushq $2
 	popq %rbx
@@ -36,6 +49,34 @@ main:
 	popq %rdi
 	call print_int
 	pushq $32
+	popq %rdi
+	call print_int
+	pushq $118
+	pushq $1
+	pushq $2
+	popq %rbx
+	popq %rax
+	cqto
+	idivq %rbx
+	pushq %rdx
+	popq %rbx
+	popq %rax
+	addq %rbx, %rax
+	pushq %rax
+	popq %rdi
+	call print_int
+	pushq $100
+	pushq $143
+	pushq $12
+	popq %rbx
+	popq %rax
+	cqto
+	idivq %rbx
+	pushq %rdx
+	popq %rbx
+	popq %rax
+	addq %rbx, %rax
+	pushq %rax
 	popq %rdi
 	call print_int
 	movq $0, %rax
