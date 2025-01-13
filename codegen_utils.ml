@@ -73,7 +73,25 @@ let c_to_int c =
   (* transforme un charactère en entier lui correspondant *)
   Hashtbl.find sigma c
 
+module VarSet = Set.Make(String) (* contient les variables libres *)
+
 let free_variables (b: tfunbody) =
   let args = b.tbody.args in
   let content = b.tbody.tcontent in
-  let 
+  let rec aux = function
+    | TECst _ ->
+      failwith "to do"
+    | TEList l ->
+      List.fold_left (fun s e -> VarSet.union s (aux (e.texpr))) (VarSet.empty) l
+    | TENot e -> aux (e.texpr)
+    | TETilde e -> aux (e.texpr)
+    | TEBinop (_,e1, e2) -> VarSet.union (aux (e1.texpr)) (aux (e2.texpr))
+    | TEUpdate (id, e) -> aux (e.texpr)
+    | TEReturn e -> aux (e.texpr)
+    | TEIf_then_else (e_if, e_then, e_else) ->
+      VarSet.union (VarSet.union (aux e_if.texpr) (aux e_then.texpr)) (aux e_else.texpr)
+    | TEBlock b ->
+      failwith "to do"
+    | 
+    | _ -> failwith "to do"
+  in aux content.texpr
