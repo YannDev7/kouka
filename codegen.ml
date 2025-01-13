@@ -72,8 +72,15 @@ and compile_expr e = match e.aexpr with
       | And -> andq !%rbx !%rax ++ pushq !%rax
       | Or  -> orq !%rbx !%rax ++ pushq !%rax
       | Eq  -> 
-        (* todo : comprendre comment fonctionnent les flags*)
-        nop
+        (* ne fonctionne que si l'on ne test qu'une seule fois == *)
+        pushq (imm 0) ++
+        cmpq !%rbx !%rax ++
+        je "lbl_eq" ++
+        popq rdi ++
+        pushq (imm 1) ++
+        label "lbl_eq" ++
+        popq rax ++
+        pushq !%rax
       | Neq ->
         nop
       | Lt ->

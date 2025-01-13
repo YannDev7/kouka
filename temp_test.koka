@@ -1,2 +1,25 @@
 fun main()
-  println("oui")
+  println(1 == 2)
+  println(1 == 1)
+  println(2 == 1)
+
+  println(1 < 2)
+  println(1 < 1)
+  println(2 < 1)
+
+  println(1 > 2)
+  println(1 > 1)
+  println(2 > 1)
+
+  println(1 != 2)
+  println(1 != 1)
+  println(2 != 1)
+
+  println(1 <= 2)
+  println(1 <= 1)
+  println(2 <= 1)
+
+  println(1 >= 2)
+  println(1 >= 1)
+  println(2 >= 1)
+  
