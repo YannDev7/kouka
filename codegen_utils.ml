@@ -72,3 +72,8 @@ let init_sigma =
 let c_to_int c =
   (* transforme un charactère en entier lui correspondant *)
   Hashtbl.find sigma c
+
+let free_variables (b: tfunbody) =
+  let args = b.tbody.args in
+  let content = b.tbody.tcontent in
+  let 

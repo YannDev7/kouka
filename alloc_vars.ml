@@ -36,17 +36,29 @@ and alloc_expr fpcur env c =
                                   [] ls
                   )
                 ))
+    | TENot e -> wrap_expr (AENot (alloc_expr fpcur env e))
+    | TETilde e -> wrap_expr (AETilde (alloc_expr fpcur env e))
     | TEBinop (op, a, b) ->
       wrap_expr (AEBinop (op, alloc_expr fpcur env a,
                               alloc_expr fpcur env b))
     | TEUpdate (id, e) ->
       wrap_expr (AEUpdate (Idmap.find id env, alloc_expr fpcur env e))
+    | TEReturn e -> wrap_expr (AEReturn (alloc_expr fpcur env e))
+    | TEIf_then_else (e_if, e_then, e_else) ->
+      wrap_expr (AEIf_then_else(alloc_expr fpcur env e_if,
+                                alloc_expr fpcur env e_then,
+                                alloc_expr fpcur env e_else))
     | TEBlock b ->
       wrap_expr (AEBlock (alloc_block fpcur env b))
+    | TEFn b ->
+      let f_var = free_variables b env in (* changer l'environnement *)
+      (* to do : ne renvoie pas la bonne chose pour l'instant *)
+      {aexpr = AECst({ aconst = ACUnit; typ = (TUnit, singleton_eff Div)}); typ = (TUnit, singleton_eff Div)}
     | TECall (f, exp_list) ->
       begin
         match tget_call_id f with 
         | Some s when s = "println" ->
+          (* On traite le cas particulier de println *)
           begin
           match exp_list with
             | e::[] ->
