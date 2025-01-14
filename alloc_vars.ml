@@ -50,10 +50,10 @@ and alloc_expr fpcur env c =
                                 alloc_expr fpcur env e_else))
     | TEBlock b ->
       wrap_expr (AEBlock (alloc_block fpcur env b))
-    | TEFn b ->
+    (* | TEFn b ->
       let f_var = free_variables b env in (* changer l'environnement *)
       (* to do : ne renvoie pas la bonne chose pour l'instant *)
-      {aexpr = AECst({ aconst = ACUnit; typ = (TUnit, singleton_eff Div)}); typ = (TUnit, singleton_eff Div)}
+      {aexpr = AECst({ aconst = ACUnit; typ = (TUnit, singleton_eff Div)}); typ = (TUnit, singleton_eff Div)} *)
     | TECall (f, exp_list) ->
       begin
         match tget_call_id f with 

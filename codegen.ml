@@ -72,25 +72,65 @@ and compile_expr e = match e.aexpr with
       | And -> andq !%rbx !%rax ++ pushq !%rax
       | Or  -> orq !%rbx !%rax ++ pushq !%rax
       | Eq  -> 
-        (* ne fonctionne que si l'on ne test qu'une seule fois == *)
-        pushq (imm 0) ++
-        cmpq !%rbx !%rax ++
-        je "lbl_eq" ++
-        popq rdi ++
+        let label_name = give_label 0 in
         pushq (imm 1) ++
-        label "lbl_eq" ++
+        cmpq !%rbx !%rax ++
+        je label_name ++
+        popq rdi ++
+        pushq (imm 0) ++
+        label label_name ++
         popq rax ++
         pushq !%rax
       | Neq ->
-        nop
+        let label_name = give_label 0 in
+        pushq (imm 1) ++
+        cmpq !%rbx !%rax ++
+        jne label_name ++
+        popq rdi ++
+        pushq (imm 0) ++
+        label label_name ++
+        popq rax ++
+        pushq !%rax
       | Lt ->
-        nop
+        let label_name = give_label 0 in
+        pushq (imm 1) ++
+        cmpq !%rbx !%rax ++
+        jl label_name ++
+        popq rdi ++
+        pushq (imm 0) ++
+        label label_name ++
+        popq rax ++
+        pushq !%rax
       | Leq ->
-        nop
+        let label_name = give_label 0 in
+        pushq (imm 1) ++
+        cmpq !%rbx !%rax ++
+        jle label_name ++
+        popq rdi ++
+        pushq (imm 0) ++
+        label label_name ++
+        popq rax ++
+        pushq !%rax
       | Gt ->
-        nop
+        let label_name = give_label 0 in
+        pushq (imm 1) ++
+        cmpq !%rbx !%rax ++
+        ja label_name ++
+        popq rdi ++
+        pushq (imm 0) ++
+        label label_name ++
+        popq rax ++
+        pushq !%rax
       | Geq ->
-        nop
+        let label_name = give_label 0 in
+        pushq (imm 1) ++
+        cmpq !%rbx !%rax ++
+        jae label_name ++
+        popq rdi ++
+        pushq (imm 0) ++
+        label label_name ++
+        popq rax ++
+        pushq !%rax
       | Pplus ->
         (* todo : concaténation chaîne de caractères *)
         nop)

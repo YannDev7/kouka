@@ -2,6 +2,8 @@ open Typed_ast
 open Alloc_ast
 open Typing_utils
 
+let n_label = ref 0
+
 let tget_call_id e = match e.texpr with
   | TECst cst ->
     begin
@@ -92,6 +94,9 @@ let free_variables (b: tfunbody) =
       VarSet.union (VarSet.union (aux e_if.texpr) (aux e_then.texpr)) (aux e_else.texpr)
     | TEBlock b ->
       failwith "to do"
-    | 
     | _ -> failwith "to do"
   in aux content.texpr
+
+let give_label p =
+  incr n_label;
+  "label_"^(string_of_int !n_label)
