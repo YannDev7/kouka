@@ -8,6 +8,9 @@ open Codegen_utils
 
 (* Production de code *)
 
+let n_string = ref 0 (* nombre de string à print *)
+let s_to_print = ref [] (* liste des string à print *)
+
 let popn n = addq (imm n) !%rsp
 let pushn n = subq (imm n) !%rsp
 
@@ -17,11 +20,7 @@ let rec compile_cst c = match c.aconst with
   | ACBool b ->
     pushq (imm (int_of_bool b))
   | ACString s ->
-    let code = ref (pushq (imm 0)) in
-    for i = 0 to (String.length s - 1) do
-      code := !code ++ pushq (imm (c_to_int (s.[i])))
-    done;
-    !code
+    nop
   | ACallPrintIntImm n ->
     (* cas où on appelle println sur un entier *)
     pushq (imm n) ++
@@ -41,10 +40,14 @@ let rec compile_cst c = match c.aconst with
     popq rdi ++
     call "print_int"
   | ACallPrintStringImm s ->
-    (* to do : à refaire entièrment *)
-    pushq (imm 0) ++
-    popq rdi ++ 
-    call "print_string"
+    s_to_print := s::(!s_to_print);
+    let code =
+    movq !%rdi !%rsi ++
+    movq (ilab ("string"^(string_of_int !n_string))) !%rdi ++
+    movq (imm 0) !%rax ++
+    call "puts" in
+    incr n_string;
+    code
   | ACallPrintString e ->
     compile_expr e ++
     popq rdi ++
@@ -173,16 +176,16 @@ let compile_program p ofile =
         movq (imm 0) !%rax ++ (* todo : vérifier l'alignement de la pile *)
         call "printf" ++
         ret ++
-        label "print_string" ++
-        movq !%rdi !%rsi ++
-        movq (ilab "message") !%rdi ++
-        movq (imm 0) !%rax ++
-        call "printf" ++
-        ret ++
         codefun;
       data =
+      let messages,_ = List.fold_left 
+      (fun (m, i) s -> 
+        (m ++ label ("string"^(string_of_int i)) ++
+        string s,
+        i+1)
+      ) (nop, 0) (!s_to_print) in
       (label ".Sprint_int" ++ string "%d\n" ++
-       label "message" ++ string "%s\n")
+       messages)
     }
   in
   let f = open_out ofile in
