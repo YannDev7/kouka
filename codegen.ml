@@ -34,11 +34,19 @@ let rec compile_cst c = match c.aconst with
     let int_of_b = int_of_bool b in
     pushq (imm int_of_b) ++
     popq rdi ++
-    call "print_int"
+    movq (imm 0) !%rcx ++
+    cmpq !%rdi !%rcx ++
+    je "print_false" ++
+    cmpq !%rdi !%rcx ++
+    jne "print_true"
   | ACallPrintBool e ->
     compile_expr e ++
     popq rdi ++
-    call "print_int"
+    movq (imm 0) !%rcx ++
+    cmpq !%rdi !%rcx ++
+    je "print_false" ++
+    cmpq !%rdi !%rcx ++
+    jne "print_true"
   | ACallPrintStringImm s ->
     s_to_print := s::(!s_to_print);
     let code =
@@ -173,8 +181,20 @@ let compile_program p ofile =
         label "print_int" ++
         movq !%rdi !%rsi ++
         movq (ilab ".Sprint_int") !%rdi ++
-        movq (imm 0) !%rax ++ (* todo : vérifier l'alignement de la pile *)
+        movq (imm 0) !%rax ++ (* todo : aligner la pile *)
         call "printf" ++
+        ret ++
+        label "print_false" ++
+        movq !%rdi !%rsi ++
+        movq (ilab (".false")) !%rdi ++
+        movq (imm 0) !%rax ++
+        call "puts" ++
+        ret ++
+        label "print_true" ++
+        movq !%rdi !%rsi ++
+        movq (ilab (".true")) !%rdi ++
+        movq (imm 0) !%rax ++
+        call "puts" ++
         ret ++
         codefun;
       data =
@@ -185,6 +205,8 @@ let compile_program p ofile =
         i+1)
       ) (nop, 0) (!s_to_print) in
       (label ".Sprint_int" ++ string "%d\n" ++
+       label ".false" ++ string "False" ++
+       label ".true" ++ string "True" ++
        messages)
     }
   in

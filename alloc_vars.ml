@@ -69,11 +69,26 @@ and alloc_expr fpcur env c =
                 | TECst c ->
                   wrap_expr (compute_const c)
                 | TEBinop (op, a, b) ->
+                  begin match op with
+                  | Add | Sub | Mul | Div | Mod ->
                   let computed_binop = alloc_expr fpcur env e in
                   wrap_expr (AECst {
                     aconst = ACallPrintInt (computed_binop);
                     typ = (TUnit, singleton_eff Div)
                   })
+                  | Eq | Neq | Lt | Leq | Gt | Geq | And | Or ->
+                    let computed_binop = alloc_expr fpcur env e in
+                  wrap_expr (AECst {
+                    aconst = ACallPrintBool (computed_binop);
+                    typ = (TUnit, singleton_eff Div)
+                  })
+                  | Pplus ->
+                    let computed_binop = alloc_expr fpcur env e in
+                  wrap_expr (AECst {
+                    aconst = ACallPrintString (computed_binop);
+                    typ = (TUnit, singleton_eff Div)
+                  })
+                  end
                 | _ -> failwith "to do"
               end
             | _ -> failwith "wrong number of parameters for println"

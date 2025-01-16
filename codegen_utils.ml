@@ -43,25 +43,40 @@ let int_of_bool b =
 
 module VarSet = Set.Make(String) (* contient les variables libres *)
 
+let rec free_expr = function
+  | TECst c ->
+    begin
+      match c.tconst with
+      | TCUnit | TCBool _ | TCInt _ | TCString _ -> VarSet.empty
+      | TCVar x -> VarSet.add x (VarSet.empty)
+    end      
+  | TEList l ->
+    List.fold_left (fun s e -> VarSet.union s (free_expr (e.texpr))) (VarSet.empty) l
+  | TENot e -> free_expr (e.texpr)
+  | TETilde e -> free_expr (e.texpr)
+  | TEBinop (_,e1, e2) -> VarSet.union (free_expr (e1.texpr)) (free_expr (e2.texpr))
+  | TEUpdate (id, e) -> free_expr (e.texpr)
+  | TEReturn e -> free_expr (e.texpr)
+  | TEIf_then_else (e_if, e_then, e_else) ->
+    VarSet.union (VarSet.union (free_expr e_if.texpr) (free_expr e_then.texpr)) (free_expr e_else.texpr)
+  | TEBlock b -> free_block b
+  | _ -> failwith "to do"
+
+and free_block (b: tblock) = 
+  List.fold_left (fun s stmt -> VarSet.union s (free_stmt stmt)) VarSet.empty b.tblock
+
+and free_stmt (s: tstmt) = match s.tstmt with
+  | TSExpr e -> free_expr e.texpr
+  (* to do : je ne suis pas sûr que cela fasse le bon truc, notamment
+     je ne sais pas ce que représente assign et update *)
+  | TSAssign (x,e) -> VarSet.remove x (free_expr e.texpr)
+  | TSUpdate (x,e) -> VarSet.remove x (free_expr e.texpr)
+
 let free_variables (b: tfunbody) =
   let args = b.tbody.args in
-  let content = b.tbody.tcontent in
-  let rec aux = function
-    | TECst _ ->
-      failwith "to do"
-    | TEList l ->
-      List.fold_left (fun s e -> VarSet.union s (aux (e.texpr))) (VarSet.empty) l
-    | TENot e -> aux (e.texpr)
-    | TETilde e -> aux (e.texpr)
-    | TEBinop (_,e1, e2) -> VarSet.union (aux (e1.texpr)) (aux (e2.texpr))
-    | TEUpdate (id, e) -> aux (e.texpr)
-    | TEReturn e -> aux (e.texpr)
-    | TEIf_then_else (e_if, e_then, e_else) ->
-      VarSet.union (VarSet.union (aux e_if.texpr) (aux e_then.texpr)) (aux e_else.texpr)
-    | TEBlock b ->
-      failwith "to do"
-    | _ -> failwith "to do"
-  in aux content.texpr
+  let content = b.tbody.tcontent
+  in List.fold_left 
+  (fun s arg -> VarSet.remove arg s) (free_expr content.texpr) args
 
 let give_label p =
   incr n_label;
