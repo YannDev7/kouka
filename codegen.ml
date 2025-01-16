@@ -150,8 +150,18 @@ and compile_expr e = match e.aexpr with
         (* todo : concaténation chaîne de caractères *)
         nop)
   | AEIf_then_else (e1, e2, e3) ->
+    let label_else = give_label 0 in
+    let label_end = give_label 0 in
     compile_expr e1 ++
-    popq rax
+    popq rax ++
+    movq (imm 0) !%rcx ++
+    cmpq !%rax !%rcx ++
+    je label_else ++
+    compile_expr e2 ++
+    jmp label_end ++
+    label label_else ++
+    compile_expr e3 ++
+    label label_end
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with

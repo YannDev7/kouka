@@ -1,2 +1,2 @@
 fun main()
-  println(True)
+  if True || False then println(2) else println(3)
