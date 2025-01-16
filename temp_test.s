@@ -2,36 +2,51 @@
 	.globl	main
 main:
 	movq %rsp, %rbp
-	pushq $0
-	popq %rax
-	notq %rax
-	pushq %rax
+	pushq $1
 	popq %rdi
-	movq $0, %rcx
-	movq %rdi, %r9
-	cmpq %r9, %rcx
-	je print_false
-	cmpq %r9, %rcx
-	jne print_true
+	call print_bool
 	movq $0, %rax
 	ret
 print_int:
 	movq %rdi, %rsi
 	movq $.Sprint_int, %rdi
 	movq $0, %rax
+	pushq %rbp
+	movq %rsp, %rbp
+	andq $-16, %rsp
 	call printf
+	movq %rbp, %rsp
+	popq %rbp
 	ret
 print_false:
 	movq %rdi, %rsi
 	movq $.false, %rdi
 	movq $0, %rax
+	pushq %rbp
+	movq %rsp, %rbp
+	andq $-16, %rsp
 	call puts
+	movq %rbp, %rsp
+	popq %rbp
 	ret
 print_true:
 	movq %rdi, %rsi
 	movq $.true, %rdi
 	movq $0, %rax
+	pushq %rbp
+	movq %rsp, %rbp
+	andq $-16, %rsp
 	call puts
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+print_bool:
+	movq $print_false, %r10
+	cmpq $0, %rdi
+	je chg_b_to_print
+	movq $print_true, %r10
+chg_b_to_print:
+	call *%r10
 	ret
 	.data
 .Sprint_int:

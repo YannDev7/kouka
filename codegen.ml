@@ -34,20 +34,11 @@ let rec compile_cst c = match c.aconst with
     let int_of_b = int_of_bool b in
     pushq (imm int_of_b) ++
     popq rdi ++
-    movq (imm 0) !%rcx ++
-    cmpq !%rdi !%rcx ++
-    je "print_false" ++
-    cmpq !%rdi !%rcx ++
-    jne "print_true"
+    call "print_bool"
   | ACallPrintBool e ->
     compile_expr e ++
     popq rdi ++
-    movq (imm 0) !%rcx ++
-    movq !%rdi !%r9 ++
-    cmpq !%r9 !%rcx ++
-    je "print_false" ++
-    cmpq !%r9 !%rcx ++
-    jne "print_true"
+    call "print_bool"
   | ACallPrintStringImm s ->
     s_to_print := s::(!s_to_print);
     let code =
@@ -72,6 +63,11 @@ and compile_expr e = match e.aexpr with
     compile_expr e ++
     popq rax ++
     notq !%rax ++
+    pushq !%rax
+  | AETilde e ->
+    compile_expr e ++
+    popq rax ++
+    negq !%rax ++
     pushq !%rax
   | AEBlock b ->
     (* TODO : check le list.rev, sans ça traite dans le mauvais sens *)
@@ -153,6 +149,9 @@ and compile_expr e = match e.aexpr with
       | Pplus ->
         (* todo : concaténation chaîne de caractères *)
         nop)
+  | AEIf_then_else (e1, e2, e3) ->
+    compile_expr e1 ++
+    popq rax
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with
@@ -190,19 +189,42 @@ let compile_program p ofile =
         movq !%rdi !%rsi ++
         movq (ilab ".Sprint_int") !%rdi ++
         movq (imm 0) !%rax ++ (* todo : aligner la pile *)
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        andq (imm (-16)) !%rsp ++
         call "printf" ++
+        movq !%rbp !%rsp ++
+        popq rbp ++
         ret ++
         label "print_false" ++
         movq !%rdi !%rsi ++
         movq (ilab (".false")) !%rdi ++
         movq (imm 0) !%rax ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        andq (imm (-16)) !%rsp ++
         call "puts" ++
+        movq !%rbp !%rsp ++
+        popq rbp ++
         ret ++
         label "print_true" ++
         movq !%rdi !%rsi ++
         movq (ilab (".true")) !%rdi ++
         movq (imm 0) !%rax ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        andq (imm (-16)) !%rsp ++
         call "puts" ++
+        movq !%rbp !%rsp ++
+        popq rbp ++
+        ret ++
+        label "print_bool" ++
+        movq (ilab "print_false") !%r10 ++
+        cmpq (imm 0) !%rdi ++
+        je "chg_b_to_print" ++
+        movq (ilab "print_true") !%r10 ++
+        label "chg_b_to_print" ++
+        call_star !%r10 ++
         ret ++
         codefun;
       data =

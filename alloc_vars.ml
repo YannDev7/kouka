@@ -52,7 +52,6 @@ and alloc_expr fpcur env c =
       wrap_expr (AEBlock (alloc_block fpcur env b))
     | TEFn b ->
       let f_var = free_variables b env in (* changer l'environnement *)
-
       (* to do : ne renvoie pas la bonne chose pour l'instant *)
       {aexpr = AECst({ aconst = ACUnit; typ = (TUnit, singleton_eff Div)}); typ = (TUnit, singleton_eff Div)}
     | TECall (f, exp_list) ->
@@ -100,6 +99,16 @@ and alloc_expr fpcur env c =
                   wrap_expr (AECst {
                     aconst = ACallPrintBool (not_computed_e);
                     typ = (TUnit,singleton_eff Div)
+                  })
+                | TETilde e ->
+                  let computed_e = alloc_expr fpcur env e in
+                  let tilde_e = {
+                    aexpr = AETilde computed_e;
+                    typ = computed_e.typ
+                  } in
+                  wrap_expr (AECst {
+                    aconst = ACallPrintInt (tilde_e);
+                    typ = tilde_e.typ
                   })
                 | TECall (f, b) -> failwith "to do"
                 | _ -> failwith "invalid parameter of println"
