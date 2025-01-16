@@ -43,40 +43,43 @@ let int_of_bool b =
 
 module VarSet = Set.Make(String) (* contient les variables libres *)
 
-let rec free_expr = function
+let rec free_expr e env = match e with
   | TECst c ->
     begin
       match c.tconst with
       | TCUnit | TCBool _ | TCInt _ | TCString _ -> VarSet.empty
-      | TCVar x -> VarSet.add x (VarSet.empty)
+      | TCVar x -> 
+        if Idmap.mem x env then VarSet.add x (VarSet.empty)
+        else VarSet.empty
     end      
   | TEList l ->
-    List.fold_left (fun s e -> VarSet.union s (free_expr (e.texpr))) (VarSet.empty) l
-  | TENot e -> free_expr (e.texpr)
-  | TETilde e -> free_expr (e.texpr)
-  | TEBinop (_,e1, e2) -> VarSet.union (free_expr (e1.texpr)) (free_expr (e2.texpr))
-  | TEUpdate (id, e) -> free_expr (e.texpr)
-  | TEReturn e -> free_expr (e.texpr)
+    List.fold_left (fun s e -> VarSet.union s (free_expr (e.texpr) env)) (VarSet.empty) l
+  | TENot e -> free_expr (e.texpr) env
+  | TETilde e -> free_expr (e.texpr) env
+  | TEBinop (_,e1, e2) -> VarSet.union (free_expr (e1.texpr) env) (free_expr (e2.texpr) env)
+  | TEUpdate (id, e) -> free_expr (e.texpr) env
+  | TEReturn e -> free_expr (e.texpr) env
   | TEIf_then_else (e_if, e_then, e_else) ->
-    VarSet.union (VarSet.union (free_expr e_if.texpr) (free_expr e_then.texpr)) (free_expr e_else.texpr)
-  | TEBlock b -> free_block b
+    VarSet.union (VarSet.union (free_expr e_if.texpr env) (free_expr e_then.texpr env))
+                 (free_expr e_else.texpr env)
+  | TEBlock b -> free_block b env
   | _ -> failwith "to do"
 
-and free_block (b: tblock) = 
-  List.fold_left (fun s stmt -> VarSet.union s (free_stmt stmt)) VarSet.empty b.tblock
+and free_block (b: tblock) env = 
+  List.fold_left (fun s stmt -> VarSet.union s (free_stmt stmt env)) VarSet.empty b.tblock
 
-and free_stmt (s: tstmt) = match s.tstmt with
-  | TSExpr e -> free_expr e.texpr
+and free_stmt (s: tstmt) env = match s.tstmt with
+  | TSExpr e -> free_expr e.texpr env
   (* to do : je ne suis pas sûr que cela fasse le bon truc, notamment
      je ne sais pas ce que représente assign et update *)
-  | TSAssign (x,e) -> VarSet.remove x (free_expr e.texpr)
-  | TSUpdate (x,e) -> VarSet.remove x (free_expr e.texpr)
+  | TSAssign (x,e) -> VarSet.remove x (free_expr e.texpr env)
+  | TSUpdate (x,e) -> VarSet.remove x (free_expr e.texpr env)
 
-let free_variables (b: tfunbody) =
+let free_variables (b: tfunbody) env =
   let args = b.tbody.args in
   let content = b.tbody.tcontent
   in List.fold_left 
-  (fun s arg -> VarSet.remove arg s) (free_expr content.texpr) args
+  (fun s arg -> VarSet.remove arg s) (free_expr content.texpr env) args
 
 let give_label p =
   incr n_label;

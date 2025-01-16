@@ -2,23 +2,16 @@
 	.globl	main
 main:
 	movq %rsp, %rbp
-	pushq $1
-	pushq $2
-	popq %rbx
-	popq %rax
-	pushq $1
-	cmpq %rbx, %rax
-	je label_1
-	popq %rdi
 	pushq $0
-label_1:
 	popq %rax
+	notq %rax
 	pushq %rax
 	popq %rdi
 	movq $0, %rcx
-	cmpq %rdi, %rcx
+	movq %rdi, %r9
+	cmpq %r9, %rcx
 	je print_false
-	cmpq %rdi, %rcx
+	cmpq %r9, %rcx
 	jne print_true
 	movq $0, %rax
 	ret

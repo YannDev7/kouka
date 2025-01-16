@@ -20,9 +20,9 @@ let rec compile_cst c = match c.aconst with
   | ACBool b ->
     pushq (imm (int_of_bool b))
   | ACString s ->
+    (* to do : faire les strings *)
     nop
   | ACallPrintIntImm n ->
-    (* cas où on appelle println sur un entier *)
     pushq (imm n) ++
     popq rdi ++
     call "print_int"
@@ -43,9 +43,10 @@ let rec compile_cst c = match c.aconst with
     compile_expr e ++
     popq rdi ++
     movq (imm 0) !%rcx ++
-    cmpq !%rdi !%rcx ++
+    movq !%rdi !%r9 ++
+    cmpq !%r9 !%rcx ++
     je "print_false" ++
-    cmpq !%rdi !%rcx ++
+    cmpq !%r9 !%rcx ++
     jne "print_true"
   | ACallPrintStringImm s ->
     s_to_print := s::(!s_to_print);
@@ -65,6 +66,13 @@ let rec compile_cst c = match c.aconst with
 and compile_expr e = match e.aexpr with
   | AECst c -> 
     compile_cst c
+  | AEList l ->
+    List.fold_left (fun code e -> code ++ (compile_expr e)) nop l
+  | AENot e ->
+    compile_expr e ++
+    popq rax ++
+    notq !%rax ++
+    pushq !%rax
   | AEBlock b ->
     (* TODO : check le list.rev, sans ça traite dans le mauvais sens *)
     List.fold_left (fun code s -> let codefun,codemain = compile_stmt (code, nop) s in

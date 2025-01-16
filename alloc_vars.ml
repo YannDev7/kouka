@@ -50,10 +50,11 @@ and alloc_expr fpcur env c =
                                 alloc_expr fpcur env e_else))
     | TEBlock b ->
       wrap_expr (AEBlock (alloc_block fpcur env b))
-    (* | TEFn b ->
+    | TEFn b ->
       let f_var = free_variables b env in (* changer l'environnement *)
+
       (* to do : ne renvoie pas la bonne chose pour l'instant *)
-      {aexpr = AECst({ aconst = ACUnit; typ = (TUnit, singleton_eff Div)}); typ = (TUnit, singleton_eff Div)} *)
+      {aexpr = AECst({ aconst = ACUnit; typ = (TUnit, singleton_eff Div)}); typ = (TUnit, singleton_eff Div)}
     | TECall (f, exp_list) ->
       begin
         match tget_call_id f with 
@@ -69,7 +70,8 @@ and alloc_expr fpcur env c =
                 | TECst c ->
                   wrap_expr (compute_const c)
                 | TEBinop (op, a, b) ->
-                  begin match op with
+                  begin 
+                  match op with
                   | Add | Sub | Mul | Div | Mod ->
                   let computed_binop = alloc_expr fpcur env e in
                   wrap_expr (AECst {
@@ -89,7 +91,18 @@ and alloc_expr fpcur env c =
                     typ = (TUnit, singleton_eff Div)
                   })
                   end
-                | _ -> failwith "to do"
+                | TENot e ->
+                  let computed_e = alloc_expr fpcur env e in
+                  let not_computed_e = {
+                    aexpr = AENot computed_e;
+                    typ = computed_e.typ
+                  } in
+                  wrap_expr (AECst {
+                    aconst = ACallPrintBool (not_computed_e);
+                    typ = (TUnit,singleton_eff Div)
+                  })
+                | TECall (f, b) -> failwith "to do"
+                | _ -> failwith "invalid parameter of println"
               end
             | _ -> failwith "wrong number of parameters for println"
           end
