@@ -1,4 +1,6 @@
 fun main()
-  val x = 3
+  val x = 2
   fn ()
+    val x = 3
     println(x)
+  println(x)

@@ -24,7 +24,9 @@ let rec alloc_const fpcur env c =
     | TCString s -> wrap_const (ACString s)
     | TCVar id -> 
       try
+        Printf.printf "kaizen";
         let x = Idmap.find id (env.local_env) in
+        Printf.printf "wesh";
         wrap_const (ACVar (Vlocal x))
       with _ ->
         wrap_const (ACVar (Vclos (Idmap.find id env.clos_env)))
@@ -76,7 +78,11 @@ and alloc_expr fpcur env c =
               (* En fonction du type du paramètre, on n'appelle pas 
               la même fonction print *)
                 | TECst c ->
-                  wrap_expr (compute_const c env)
+                  wrap_expr (AECst {
+                    aconst = ACallPrintInt ({ aexpr = compute_const c env; typ = (TUnit, singleton_eff Div)});
+                    typ = (TUnit, singleton_eff Div)
+                  })
+                  (* wrap_expr (compute_const c env) *)
                 | TEBinop (op, a, b) ->
                   begin 
                   match op with
@@ -127,15 +133,18 @@ and alloc_expr fpcur env c =
         | Some s -> failwith "les autres fonctions ne sont pas encore implémentées" 
         | None -> failwith "faire l'erreur"
       end
-    | _ -> failwith "todo"
 
 and alloc_block fpcur env c =
+  let env = ref env in
   let wrap_block _block =
     { ablock = _block; typ = c.typ } in 
   let _block =
     let rec aux cc = match cc with
       | [] -> []
-      | hd::tl -> (alloc_stmt fpcur env hd)::(aux tl)
+      | hd::tl -> 
+        let allowed, new_env = (alloc_stmt fpcur !env hd) in
+        env := new_env;
+        allowed::(aux tl)
     in aux c.tblock
   in wrap_block _block
       
@@ -143,7 +152,7 @@ and alloc_stmt fpcur env c =
   let wrap_stmt _stmt =
     { astmt = _stmt; typ = c.typ } in 
   match c.tstmt with
-    | TSExpr e -> wrap_stmt (ASExpr (alloc_expr fpcur env e))
+    | TSExpr e -> wrap_stmt (ASExpr (alloc_expr fpcur env e)), env
     | TSAssign (id, e) ->
       let new_env_loc = Idmap.add id (fpcur - 8) env.local_env in
       let new_env = {
@@ -151,7 +160,7 @@ and alloc_stmt fpcur env c =
         clos_env = env.clos_env
       } in
       wrap_stmt (ASAssign (fpcur - 8,
-                          alloc_expr (fpcur - 8) new_env e))
+                          alloc_expr (fpcur - 8) new_env e)), new_env
     | TSUpdate (id, e) ->
       let new_env_loc = Idmap.add id (fpcur - 8) env.local_env in
       let new_env = {
@@ -159,7 +168,7 @@ and alloc_stmt fpcur env c =
         clos_env = env.clos_env
       } in
       wrap_stmt (ASUpdate (fpcur - 8,
-                          alloc_expr (fpcur - 8) new_env e))
+                          alloc_expr (fpcur - 8) new_env e)), new_env
 and alloc_body fpcur env (c: tfunbody) =
   let wrap_body _body =
     { abody = _body; typ = c.typ } in 

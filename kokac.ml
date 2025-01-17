@@ -47,7 +47,6 @@ let () =
     (*Interp.file f*)
 
     let t_f = Typing.type_file _f in
-
     if !type_only then exit 0;
 
     let file_s = Filename.chop_suffix file ".koka" ^ ".s" in

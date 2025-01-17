@@ -20,7 +20,7 @@ let rec compile_cst c = match c.aconst with
   | ACBool b ->
     pushq (imm (int_of_bool b))
   | ACString s ->
-    (* to do : faire les strings *)
+    (* to do : faire les strchg_b_to_printings *)
     nop
   | ACallPrintIntImm n ->
     pushq (imm n) ++
@@ -52,6 +52,14 @@ let rec compile_cst c = match c.aconst with
     compile_expr e ++
     popq rdi ++
     call "print_string"
+  | ACVar v ->
+    begin
+    match v with
+    | Vlocal n ->
+      movq (ind ~ofs:n rbp) !%rax ++
+      pushq !%rax
+    | _ -> failwith "to do"
+    end
   | _ -> failwith "to do"
 
 and compile_expr e = match e.aexpr with
@@ -164,28 +172,38 @@ and compile_expr e = match e.aexpr with
     label label_end
   | AEClos b ->
     let codefun, codemain = compile_body (nop, nop) b in
-    codemain
+    codefun
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with
   | ASExpr e -> 
     let code = compile_expr {aexpr = e.aexpr; typ = s.typ}
     in code ++ codefun, codemain
-  | _ -> failwith "pas encore implémenté"
+    (* LES DEUX CAS SUIVANT NE FONCTIONNENT PAS CORRECTEMENT *)
+  | ASAssign (n, e) ->
+    let code = compile_expr {aexpr = e.aexpr; typ = s.typ} in
+    code ++ 
+    popq rax ++
+    movq !%rax (ind ~ofs:n rbp) ++
+    codefun, codemain
+  |  ASUpdate (n,e) ->
+    let code = compile_expr {aexpr = e.aexpr; typ = s.typ} in
+    code ++ codefun, codemain
 
 and compile_body (codefun, codemain) (b : afunbody) =
   let typ = b.typ in
   let body = b.abody in
-  let args = body.args in
+  (* let args = body.args in *)
   let expr = body.acontent in
   let code = compile_expr {aexpr = expr.aexpr;
                            typ = typ} in
-  (codefun,codemain ++ code) 
+  (codefun ++ code,codemain) 
 
 let compile_decl (codefun, codemain) d =
-  let name = d.adecl.name in
+  let name = "."^d.adecl.name in
   let abody = d.adecl.abody in
-  compile_body (codefun, codemain) abody
+  let cf,cm = compile_body (codefun, codemain) abody in
+  (label name ++ cf ++ ret, cm)
 
 let compile_program p ofile =
   let p = alloc_file p in
@@ -195,6 +213,7 @@ let compile_program p ofile =
     { text =
         globl "main" ++ label "main" ++
         movq !%rsp !%rbp ++
+        call ".main" ++
         code ++
         movq (imm 0) !%rax ++ (* exit *)
         ret ++
@@ -239,6 +258,15 @@ let compile_program p ofile =
         label "chg_b_to_print" ++
         call_star !%r10 ++
         ret ++
+        label "my_malloc" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        andq (imm (-16)) !%rsp ++
+        movq (ind ~ofs:24 rbp) !%rdi ++
+        call "malloc" ++
+        movq !%rbp !%rsp ++
+        popq rbp ++
+        ret ++        
         codefun;
       data =
       let messages,_ = List.fold_left 

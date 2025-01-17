@@ -2,9 +2,7 @@
 	.globl	main
 main:
 	movq %rsp, %rbp
-	pushq $12
-	popq %rdi
-	call print_int
+	call .main
 	movq $0, %rax
 	ret
 print_int:
@@ -47,6 +45,31 @@ print_bool:
 	movq $print_true, %r10
 chg_b_to_print:
 	call *%r10
+	ret
+my_malloc:
+	pushq %rbp
+	movq %rsp, %rbp
+	andq $-16, %rsp
+	movq 24(%rbp), %rdi
+	call malloc
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+.main:
+	pushq $2
+	popq %rax
+	movq %rax, -16(%rbp)
+	pushq $3
+	popq %rax
+	movq %rax, -24(%rbp)
+	movq -24(%rbp), %rax
+	pushq %rax
+	popq %rdi
+	call print_int
+	movq -16(%rbp), %rax
+	pushq %rax
+	popq %rdi
+	call print_int
 	ret
 	.data
 .Sprint_int:

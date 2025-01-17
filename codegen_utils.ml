@@ -53,7 +53,7 @@ let compute_const c env =
       })
       with _ ->
       (AECst {
-        aconst = ACVar (Vlocal (Idmap.find id env.clos_env));
+        aconst = ACVar (Vclos (Idmap.find id env.clos_env));
         typ = (TUnit, singleton_eff Div)
       })
       end
