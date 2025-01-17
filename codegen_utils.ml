@@ -4,6 +4,14 @@ open Typing_utils
 
 let n_label = ref 0
 
+
+module Idmap = Map.Make(String)
+
+type alloc_env = {
+  local_env: int Idmap.t;
+  clos_env: int Idmap.t
+}
+
 let tget_call_id e = match e.texpr with
   | TECst cst ->
     begin
@@ -19,7 +27,7 @@ Notamment traite les expressions arithmétiques *)
   | TECst cst -> cst.tconst
   | _ -> failwith "to do"
 
-let compute_const c = 
+let compute_const c env = 
     match c.tconst with
     | TCInt n -> 
       (AECst {
@@ -36,50 +44,65 @@ let compute_const c =
         aconst = ACallPrintStringImm s;
         typ = (TUnit, singleton_eff Div)
       })
+    | TCVar id ->
+      begin
+      try 
+      (AECst {
+        aconst = ACVar (Vlocal (Idmap.find id env.local_env));
+        typ = (TUnit, singleton_eff Div)
+      })
+      with _ ->
+      (AECst {
+        aconst = ACVar (Vlocal (Idmap.find id env.clos_env));
+        typ = (TUnit, singleton_eff Div)
+      })
+      end
     | _ -> failwith "non implémenté"
 
 let int_of_bool b =
   if b then 1 else 0
 
-module VarSet = Set.Make(String) (* contient les variables libres *)
-
+module VarMap = Map.Make(String) (* contient les variables libres *)
+(* 
 let rec free_expr e env = match e with
   | TECst c ->
     begin
       match c.tconst with
-      | TCUnit | TCBool _ | TCInt _ | TCString _ -> VarSet.empty
+      | TCUnit | TCBool _ | TCInt _ | TCString _ -> VarMap.empty
       | TCVar x -> 
-        if Idmap.mem x env then VarSet.add x (VarSet.empty)
-        else VarSet.empty
+        if Idmap.mem x env then VarMap.add x (Idmap.find x env) VarMap.empty
+        else VarMap.empty
     end      
   | TEList l ->
-    List.fold_left (fun s e -> VarSet.union s (free_expr (e.texpr) env)) (VarSet.empty) l
+    List.fold_left (fun s e -> 
+    VarMap.union (fun id x y -> Some(y)) s (free_expr (e.texpr) env)) (VarMap.empty) l
   | TENot e -> free_expr (e.texpr) env
   | TETilde e -> free_expr (e.texpr) env
-  | TEBinop (_,e1, e2) -> VarSet.union (free_expr (e1.texpr) env) (free_expr (e2.texpr) env)
+  | TEBinop (_,e1, e2) -> 
+    VarMap.union (fun id x y -> Some(y)) (free_expr (e1.texpr) env) (free_expr (e2.texpr) env)
   | TEUpdate (id, e) -> free_expr (e.texpr) env
   | TEReturn e -> free_expr (e.texpr) env
   | TEIf_then_else (e_if, e_then, e_else) ->
-    VarSet.union (VarSet.union (free_expr e_if.texpr env) (free_expr e_then.texpr env))
+    VarMap.union (VarMap.union (free_expr e_if.texpr env) (free_expr e_then.texpr env))
                  (free_expr e_else.texpr env)
   | TEBlock b -> free_block b env
   | _ -> failwith "to do"
 
 and free_block (b: tblock) env = 
-  List.fold_left (fun s stmt -> VarSet.union s (free_stmt stmt env)) VarSet.empty b.tblock
+  List.fold_left (fun s stmt -> VarMap.union s (free_stmt stmt env)) VarMap.empty b.tblock
 
 and free_stmt (s: tstmt) env = match s.tstmt with
   | TSExpr e -> free_expr e.texpr env
   (* to do : je ne suis pas sûr que cela fasse le bon truc, notamment
      je ne sais pas ce que représente assign et update *)
-  | TSAssign (x,e) -> VarSet.remove x (free_expr e.texpr env)
-  | TSUpdate (x,e) -> VarSet.remove x (free_expr e.texpr env)
+  | TSAssign (x,e) -> VarMap.remove x (free_expr e.texpr env)
+  | TSUpdate (x,e) -> VarMap.remove x (free_expr e.texpr env)
 
 let free_variables (b: tfunbody) env =
   let args = b.tbody.args in
   let content = b.tbody.tcontent
   in List.fold_left 
-  (fun s arg -> VarSet.remove arg s) (free_expr content.texpr env) args
+  (fun s arg -> VarMap.remove arg s) (free_expr content.texpr env) args *)
 
 let give_label p =
   incr n_label;

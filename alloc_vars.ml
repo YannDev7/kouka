@@ -3,13 +3,15 @@ open Alloc_ast
 open Typed_ast
 open Typing_utils
 open Codegen_utils
-
+(* 
 module Idmap = Map.Make(String)
 
 type alloc_env = {
   local_env: int Idmap.t;
   clos_env: int Idmap.t
-}
+} *)
+
+let defined_functions = Hashtbl.create 16
 
 let rec alloc_const fpcur env c = 
   ignore(c.tconst);
@@ -20,7 +22,12 @@ let rec alloc_const fpcur env c =
     | TCBool b -> wrap_const (ACBool b)
     | TCInt i -> wrap_const (ACInt i)
     | TCString s -> wrap_const (ACString s)
-    | TCVar id -> wrap_const (ACVar (Vlocal (Idmap.find id env)))
+    | TCVar id -> 
+      try
+        let x = Idmap.find id (env.local_env) in
+        wrap_const (ACVar (Vlocal x))
+      with _ ->
+        wrap_const (ACVar (Vclos (Idmap.find id env.clos_env)))
 
 and alloc_expr fpcur env c =
   ignore(c.texpr);
@@ -42,7 +49,7 @@ and alloc_expr fpcur env c =
       wrap_expr (AEBinop (op, alloc_expr fpcur env a,
                               alloc_expr fpcur env b))
     | TEUpdate (id, e) ->
-      wrap_expr (AEUpdate (Idmap.find id env, alloc_expr fpcur env e))
+      wrap_expr (AEUpdate (Idmap.find id env.local_env, alloc_expr fpcur env e))
     | TEReturn e -> wrap_expr (AEReturn (alloc_expr fpcur env e))
     | TEIf_then_else (e_if, e_then, e_else) ->
       wrap_expr (AEIf_then_else(alloc_expr fpcur env e_if,
@@ -51,9 +58,11 @@ and alloc_expr fpcur env c =
     | TEBlock b ->
       wrap_expr (AEBlock (alloc_block fpcur env b))
     | TEFn b ->
-      let f_var = free_variables b env in (* changer l'environnement *)
-      (* to do : ne renvoie pas la bonne chose pour l'instant *)
-      {aexpr = AECst({ aconst = ACUnit; typ = (TUnit, singleton_eff Div)}); typ = (TUnit, singleton_eff Div)}
+      let new_env = {
+        local_env = env.local_env;
+        clos_env = Idmap.union (fun id x y -> Some(x)) env.local_env env.clos_env
+      } in
+      wrap_expr (AEClos (alloc_body fpcur new_env b))
     | TECall (f, exp_list) ->
       begin
         match tget_call_id f with 
@@ -67,7 +76,7 @@ and alloc_expr fpcur env c =
               (* En fonction du type du paramètre, on n'appelle pas 
               la même fonction print *)
                 | TECst c ->
-                  wrap_expr (compute_const c)
+                  wrap_expr (compute_const c env)
                 | TEBinop (op, a, b) ->
                   begin 
                   match op with
@@ -136,22 +145,34 @@ and alloc_stmt fpcur env c =
   match c.tstmt with
     | TSExpr e -> wrap_stmt (ASExpr (alloc_expr fpcur env e))
     | TSAssign (id, e) ->
-      let new_env = Idmap.add id (fpcur - 8) env in
+      let new_env_loc = Idmap.add id (fpcur - 8) env.local_env in
+      let new_env = {
+        local_env = new_env_loc;
+        clos_env = env.clos_env
+      } in
       wrap_stmt (ASAssign (fpcur - 8,
                           alloc_expr (fpcur - 8) new_env e))
     | TSUpdate (id, e) ->
-      let new_env = Idmap.add id (fpcur - 8) env in
+      let new_env_loc = Idmap.add id (fpcur - 8) env.local_env in
+      let new_env = {
+        local_env = new_env_loc;
+        clos_env = env.clos_env
+      } in
       wrap_stmt (ASUpdate (fpcur - 8,
                           alloc_expr (fpcur - 8) new_env e))
 and alloc_body fpcur env (c: tfunbody) =
   let wrap_body _body =
     { abody = _body; typ = c.typ } in 
   
-  let new_env, delta = List.fold_left
+  let new_env_loc, delta = List.fold_left
                   (fun (acc, delta) id ->
                     (Idmap.add id (fpcur + delta) acc, delta - 8))
-                  (env, -8)
+                  (env.local_env, -8)
                   c.tbody.args in
+  let new_env = {
+    local_env = new_env_loc;
+    clos_env = Idmap.empty
+  } in
   let _content = alloc_expr (fpcur + delta) new_env 
                             c.tbody.tcontent in
   let _body = { acontent = _content; args = c.tbody.args } in
@@ -167,6 +188,12 @@ and alloc_decl fpcur env c =
 and alloc_file ls =
   List.rev(
     List.fold_left
-      (fun acc decl -> (alloc_decl 0 (Idmap.empty) decl)::acc)
+      (fun acc decl -> 
+        let allocated_decl = (alloc_decl 0 {
+          local_env = Idmap.empty;
+          clos_env = Idmap.empty
+        } decl) in
+       Hashtbl.add defined_functions decl.tdecl.name allocated_decl;
+       allocated_decl::acc)
       [] ls
   )

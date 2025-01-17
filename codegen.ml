@@ -162,6 +162,9 @@ and compile_expr e = match e.aexpr with
     label label_else ++
     compile_expr e3 ++
     label label_end
+  | AEClos b ->
+    let codefun, codemain = compile_body (nop, nop) b in
+    codemain
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with
@@ -170,7 +173,7 @@ and compile_stmt (codefun, codemain) s = match s.astmt with
     in code ++ codefun, codemain
   | _ -> failwith "pas encore implémenté"
 
-let compile_body (codefun, codemain) (b : afunbody) =
+and compile_body (codefun, codemain) (b : afunbody) =
   let typ = b.typ in
   let body = b.abody in
   let args = body.args in

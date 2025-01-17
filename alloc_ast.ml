@@ -22,7 +22,7 @@ and avar =
   | Vlocal of int
   | Vglobal of ident
   | Vclos of int
-  | Varg
+  | Varg of ident
 and aconst = {
   aconst: _aconst;
   typ: typ

@@ -2,25 +2,9 @@
 	.globl	main
 main:
 	movq %rsp, %rbp
-	pushq $1
-	pushq $0
-	popq %rbx
-	popq %rax
-	orq %rbx, %rax
-	pushq %rax
-	popq %rax
-	movq $0, %rcx
-	cmpq %rax, %rcx
-	je label_1
-	pushq $2
+	pushq $12
 	popq %rdi
 	call print_int
-	jmp label_2
-label_1:
-	pushq $3
-	popq %rdi
-	call print_int
-label_2:
 	movq $0, %rax
 	ret
 print_int:

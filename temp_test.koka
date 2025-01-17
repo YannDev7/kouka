@@ -1,2 +1,4 @@
 fun main()
-  if True || False then println(2) else println(3)
+  val x = 3
+  fn ()
+    println(x)
