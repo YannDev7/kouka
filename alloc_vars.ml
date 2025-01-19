@@ -12,6 +12,7 @@ type alloc_env = {
 } *)
 
 let defined_functions = Hashtbl.create 16
+let total_decalage = ref 0
 
 let rec alloc_const fpcur env c = 
   ignore(c.tconst);
@@ -24,14 +25,16 @@ let rec alloc_const fpcur env c =
     | TCString s -> wrap_const (ACString s)
     | TCVar id -> 
       try
-        Printf.printf "kaizen";
         let x = Idmap.find id (env.local_env) in
-        Printf.printf "wesh";
         wrap_const (ACVar (Vlocal x))
       with _ ->
+        try
         wrap_const (ACVar (Vclos (Idmap.find id env.clos_env)))
+        with _ -> 
+          wrap_const (ACVar (Vglobal id))
 
 and alloc_expr fpcur env c =
+  total_decalage := fpcur;
   ignore(c.texpr);
   let wrap_expr _expr =
     { aexpr = _expr; typ = c.typ } in
@@ -61,7 +64,7 @@ and alloc_expr fpcur env c =
       wrap_expr (AEBlock (alloc_block fpcur env b))
     | TEFn b ->
       let new_env = {
-        local_env = env.local_env;
+        local_env = Idmap.empty;
         clos_env = Idmap.union (fun id x y -> Some(x)) env.local_env env.clos_env
       } in
       wrap_expr (AEClos (alloc_body fpcur new_env b))
@@ -78,11 +81,7 @@ and alloc_expr fpcur env c =
               (* En fonction du type du paramètre, on n'appelle pas 
               la même fonction print *)
                 | TECst c ->
-                  wrap_expr (AECst {
-                    aconst = ACallPrintInt ({ aexpr = compute_const c env; typ = (TUnit, singleton_eff Div)});
-                    typ = (TUnit, singleton_eff Div)
-                  })
-                  (* wrap_expr (compute_const c env) *)
+                  wrap_expr (compute_const c env)
                 | TEBinop (op, a, b) ->
                   begin 
                   match op with
@@ -125,13 +124,19 @@ and alloc_expr fpcur env c =
                     aconst = ACallPrintInt (tilde_e);
                     typ = tilde_e.typ
                   })
-                | TECall (f, b) -> failwith "to do"
+                | TECall (f, b) ->
+                  wrap_expr (AECall
+                  (alloc_expr fpcur env f,
+                   List.map (fun x -> alloc_expr fpcur env x) b))
                 | _ -> failwith "invalid parameter of println"
               end
             | _ -> failwith "wrong number of parameters for println"
           end
-        | Some s -> failwith "les autres fonctions ne sont pas encore implémentées" 
-        | None -> failwith "faire l'erreur"
+        | Some s ->
+          wrap_expr (AECall (
+            alloc_expr fpcur env f
+          , List.map (fun x -> alloc_expr fpcur env x) exp_list))
+        | None -> failwith "Function expression is not correct"
       end
 
 and alloc_block fpcur env c =
@@ -155,18 +160,22 @@ and alloc_stmt fpcur env c =
     | TSExpr e -> wrap_stmt (ASExpr (alloc_expr fpcur env e)), env
     | TSAssign (id, e) ->
       let new_env_loc = Idmap.add id (fpcur - 8) env.local_env in
+      total_decalage := !total_decalage + 8;
       let new_env = {
         local_env = new_env_loc;
         clos_env = env.clos_env
       } in
+      total_decalage := !total_decalage + 8;
       wrap_stmt (ASAssign (fpcur - 8,
                           alloc_expr (fpcur - 8) new_env e)), new_env
     | TSUpdate (id, e) ->
       let new_env_loc = Idmap.add id (fpcur - 8) env.local_env in
+      total_decalage := !total_decalage + 8;
       let new_env = {
         local_env = new_env_loc;
         clos_env = env.clos_env
       } in
+      total_decalage := !total_decalage + 8;
       wrap_stmt (ASUpdate (fpcur - 8,
                           alloc_expr (fpcur - 8) new_env e)), new_env
 and alloc_body fpcur env (c: tfunbody) =
@@ -175,9 +184,10 @@ and alloc_body fpcur env (c: tfunbody) =
   
   let new_env_loc, delta = List.fold_left
                   (fun (acc, delta) id ->
-                    (Idmap.add id (fpcur + delta) acc, delta - 8))
-                  (env.local_env, -8)
+                    (Idmap.add id (fpcur + delta) acc, delta + 8))
+                  (env.local_env, 16)
                   c.tbody.args in
+  total_decalage := !total_decalage + 8*(List.length c.tbody.args);
   let new_env = {
     local_env = new_env_loc;
     clos_env = Idmap.empty

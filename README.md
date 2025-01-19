@@ -7,10 +7,14 @@ Mon compilateur passe tous les tests de la partie 1 et 2. Toutefois, mon infére
 > make test1
 - Pour run les test de la partie 2.
 > make test2
+- Pour run les tests de la partie 3.
+> make test3
 - on peut utiliser le compilateur ainsi:
 > ./kokac.exe main.koka
 - Un sous ensemble intéressant des tests que j'ai écrit se trouve dans les dossiers tests/typing et tests/syntax. Ils sont préfixés de "Y-".
 - le fichier **pp.ml** contient des pretty printer plus ou moins complets (typiquement, pour le typage, je me suis contenté d'afficher les types plutôt que l'ast typé)
+- Pour les tests sur un autre fichier : écrire dans temp_test.koka
+> make temp_test
 
 # Lexer, parser:
 - la fonction **next_tokens** correspond au premier lexer, sans l'identation.
@@ -79,6 +83,19 @@ alors que
 ```
 fun pp_ls(ls: list<int>) {
   if True return 42
-}```
+}
+```
 
 ne l'est pas. Mais dans les faits il n'y a aucun moyen de savoir que la condition du if est tout le temps vraie.
+
+
+# Production de code :
+
+- L'allocation de variables produit un nouvel ast dans lequel les Var sont paramétrées par un entier (la "distance" à rbp). On fait bien attention à aller dans le sens positif quand on alloue les arguments avant un appel de fonction. Pour gérer les clôtures,on maintient deux environnements: un pour les variables locales et l'autre pour les variables capturées dans la clôture. Lorsque l'on cherche l'offset associé à une variable, on regarde en priorité l'environnement local (pour le shadowing) puis l'environnement de clôture
+- Attention, les val causent un segmentation fault mais nous n'arrivons pas à savoir d'où cela provient, le programme s'execute tout de même sans soucis, notamment les println affichent ce qu'il faut.
+- Dans l'ensemble, les fonctionnalités implémentées sont les suivantes : println, expression arithmétiques (sauf concaténation), blocks, conditions if then else, val lorsque l'argument est un entier ou booléen ou string, appels de fonctions, fonctions anonymes (mais que l'on ne peut pas appeler)
+- Lors de la compilation, les fonctions (y compris) sont toute nommée par le nom correspondant dans le programme précédé d'un ., on a ainsi, dans chaque programme on trouve donc un label **.main** qui est appelé depuis le label **main**. De plus les fonctions de base **print_int**, **print_false**, **print_true**, **print_bool** et **my_malloc** se trouvent entre le label **main** et les fonctions du programme que l'on compile.
+- Pour ce qui est des println, on distingue les println pour les trois types : int, string, bool par les constructeurs : **ACallPrintInt**, **ACallPrintString**, ... De plus, on distingue le cas d'une valeur immédiate passée en argument et le cas d'une expression, ce qu'on fait en ajoutant **ACallPrintIntImm** par exemple. De plus, on distingue aussi un constructeur utile lorsque **println** est passé en argument d'une fonction (ce cas n'est pas implémenté dans notre code mais le constructeur existe). Pour afficher les strings, on place chaque string dans le **.data** lorsqu'on les voit, et on les récupère lorsque l'on a un appel à **println**
+- Lorsque l'on rencontre une instruction de la forme **val _ = _** on ajoute la nouvelle variable à l'environnement local et on la place à l'adresse qui avait été calculée par l'allocation des variables.
+- Pour les appels de fonctions, cela fonctionne uniquement si la fonction n'est pas une fermeture, on fait donc un **call .f** où f est le nom de la fonction.
+- Pour les fermetures, avant de traiter la fermeture, on ajoute l'actuel environnement local à l'environnement de clôture, cela nous permet de garder les variables définies précédemment. Et cela permet de ne pas modifier l'environnement local lorsque l'on sort de la fermeture.

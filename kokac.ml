@@ -49,6 +49,8 @@ let () =
     let t_f = Typing.type_file _f in
     if !type_only then exit 0;
 
+    (* pp_file Format.std_formatter _f; *)
+
     let file_s = Filename.chop_suffix file ".koka" ^ ".s" in
     let () = compile_program t_f file_s in ();
     exit 0

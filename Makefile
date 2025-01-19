@@ -7,6 +7,9 @@ test1: koka
 test2: koka
 	./test.sh -2 ./kokac.exe
 
+test3: koka
+	./test.sh -3 ./kokac.exe
+
 clean:
 	rm -rf ./_build
 	rm -rf kokak.exe

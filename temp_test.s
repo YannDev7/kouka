@@ -55,21 +55,28 @@ my_malloc:
 	movq %rbp, %rsp
 	popq %rbp
 	ret
-.main:
-	pushq $2
-	popq %rax
-	movq %rax, -16(%rbp)
+label_1:
 	pushq $3
 	popq %rax
-	movq %rax, -24(%rbp)
-	movq -24(%rbp), %rax
+	movq %rax, 24(%rbp)
+	movq 24(%rbp), %rax
 	pushq %rax
 	popq %rdi
 	call print_int
-	movq -16(%rbp), %rax
+	ret
+.main:
+	pushq %rbp
+	movq %rsp, %rbp
+	subq $16, %rsp
+	pushq $2
+	popq %rax
+	movq %rax, 8(%rbp)
+	movq 8(%rbp), %rax
 	pushq %rax
 	popq %rdi
 	call print_int
+	addq $16, %rsp
+	popq %rbp
 	ret
 	.data
 .Sprint_int:

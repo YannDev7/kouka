@@ -14,14 +14,22 @@ let s_to_print = ref [] (* liste des string à print *)
 let popn n = addq (imm n) !%rsp
 let pushn n = subq (imm n) !%rsp
 
+let defined_fn = Hashtbl.create 16
+
 let rec compile_cst c = match c.aconst with
   | ACInt n ->
     pushq (imm n) 
   | ACBool b ->
     pushq (imm (int_of_bool b))
   | ACString s ->
-    (* to do : faire les strchg_b_to_printings *)
-    nop
+    s_to_print := (!s_to_print)@[s]; (* to do mettre les string à la fin *)
+    let code =
+    movq !%rdi !%rsi ++
+    movq (ilab ("string"^(string_of_int !n_string))) !%rdi ++
+    movq (imm 0) !%rax ++
+    pushq !%rdi in
+    incr n_string;
+    code
   | ACallPrintIntImm n ->
     pushq (imm n) ++
     popq rdi ++
@@ -40,7 +48,7 @@ let rec compile_cst c = match c.aconst with
     popq rdi ++
     call "print_bool"
   | ACallPrintStringImm s ->
-    s_to_print := s::(!s_to_print);
+    s_to_print := (!s_to_print)@[s];
     let code =
     movq !%rdi !%rsi ++
     movq (ilab ("string"^(string_of_int !n_string))) !%rdi ++
@@ -51,16 +59,18 @@ let rec compile_cst c = match c.aconst with
   | ACallPrintString e ->
     compile_expr e ++
     popq rdi ++
-    call "print_string"
+    call "puts"
   | ACVar v ->
     begin
     match v with
     | Vlocal n ->
       movq (ind ~ofs:n rbp) !%rax ++
       pushq !%rax
-    | _ -> failwith "to do"
+    | Vglobal id ->
+      pushq (ilab ("."^id))
+    | _ -> failwith "to do var"
     end
-  | _ -> failwith "to do"
+  | _ -> failwith "to do compile_cst"
 
 and compile_expr e = match e.aexpr with
   | AECst c -> 
@@ -78,7 +88,6 @@ and compile_expr e = match e.aexpr with
     negq !%rax ++
     pushq !%rax
   | AEBlock b ->
-    (* TODO : check le list.rev, sans ça traite dans le mauvais sens *)
     List.fold_left (fun code s -> let codefun,codemain = compile_stmt (code, nop) s in
                                   codefun) nop (List.rev b.ablock);
   | AEBinop (op, a, b) ->
@@ -172,14 +181,26 @@ and compile_expr e = match e.aexpr with
     label label_end
   | AEClos b ->
     let codefun, codemain = compile_body (nop, nop) b in
-    codefun
+    let label_fn = give_label 0 in
+    Hashtbl.add defined_fn label_fn (label label_fn ++ codefun ++ ret);
+    codemain
+  | AECall (f, e_list) ->
+    begin
+      match f.aexpr with
+      | AECst ({aconst = ACVar(Vglobal id); typ = _}) ->
+        let code,_ = List.fold_left (fun (code, i) arg -> 
+        (code ++ (compile_expr arg), i+1)) (nop,1) (List.rev e_list) in
+        code ++
+        call ("."^id) ++
+        List.fold_left (fun code _ -> code ++ popq rax) nop e_list
+      | _ -> failwith "to do"
+      end
   | _ -> failwith "to do"
 
 and compile_stmt (codefun, codemain) s = match s.astmt with
   | ASExpr e -> 
     let code = compile_expr {aexpr = e.aexpr; typ = s.typ}
     in code ++ codefun, codemain
-    (* LES DEUX CAS SUIVANT NE FONCTIONNENT PAS CORRECTEMENT *)
   | ASAssign (n, e) ->
     let code = compile_expr {aexpr = e.aexpr; typ = s.typ} in
     code ++ 
@@ -202,8 +223,17 @@ and compile_body (codefun, codemain) (b : afunbody) =
 let compile_decl (codefun, codemain) d =
   let name = "."^d.adecl.name in
   let abody = d.adecl.abody in
-  let cf,cm = compile_body (codefun, codemain) abody in
-  (label name ++ cf ++ ret, cm)
+  let cf,cm = compile_body (nop, nop) abody in
+  (* Printf.printf "%d" !total_decalage; *)
+  (codefun ++ 
+  label name ++ 
+  pushq !%rbp ++
+  movq !%rsp !%rbp ++
+  pushn (!total_decalage) ++
+  cf ++
+  popn (!total_decalage) ++
+  popq rbp ++
+  ret, codemain ++ cm)
 
 let compile_program p ofile =
   let p = alloc_file p in
@@ -266,7 +296,8 @@ let compile_program p ofile =
         call "malloc" ++
         movq !%rbp !%rsp ++
         popq rbp ++
-        ret ++        
+        ret ++
+        Hashtbl.fold (fun id codefn code -> code ++ codefn) defined_fn nop ++       
         codefun;
       data =
       let messages,_ = List.fold_left 
@@ -274,7 +305,7 @@ let compile_program p ofile =
         (m ++ label ("string"^(string_of_int i)) ++
         string s,
         i+1)
-      ) (nop, 0) (!s_to_print) in
+      ) (nop, 0) !s_to_print in
       (label ".Sprint_int" ++ string "%d\n" ++
        label ".false" ++ string "False" ++
        label ".true" ++ string "True" ++

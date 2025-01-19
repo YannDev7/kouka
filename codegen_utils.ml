@@ -28,6 +28,7 @@ Notamment traite les expressions arithmétiques *)
   | _ -> failwith "to do"
 
 let compute_const c env = 
+  (* Pour les appels à println *)
     match c.tconst with
     | TCInt n -> 
       (AECst {
@@ -45,19 +46,87 @@ let compute_const c env =
         typ = (TUnit, singleton_eff Div)
       })
     | TCVar id ->
-      begin
-      try 
-      (AECst {
-        aconst = ACVar (Vlocal (Idmap.find id env.local_env));
-        typ = (TUnit, singleton_eff Div)
-      })
-      with _ ->
-      (AECst {
-        aconst = ACVar (Vclos (Idmap.find id env.clos_env));
-        typ = (TUnit, singleton_eff Div)
-      })
-      end
+      begin match c.typ with
+        | TVar {id = _; def = Some (TInt,_)},_ -> 
+        begin
+        try 
+        (AECst {
+          aconst = ACallPrintInt ( {
+            aexpr = AECst {
+              aconst = ACVar (Vlocal (Idmap.find id env.local_env));
+              typ = (TInt, ESet (Effset.empty))
+            };
+            typ = (TUnit, singleton_eff Div)
+        });
+          typ = (TUnit, singleton_eff Div) })
+        with _ ->
+        
+        (AECst {
+          aconst = ACallPrintBool ( {
+            aexpr = AECst {
+              aconst = ACVar (Vclos (Idmap.find id env.local_env));
+              typ = (TInt, ESet (Effset.empty))
+            };
+            typ = (TUnit, singleton_eff Div)
+        });
+          typ = (TUnit, singleton_eff Div) })
+        end
+
+      | TVar {id = _; def = Some (TBool,_)},_ -> 
+        begin
+        try 
+        (AECst {
+          aconst = ACallPrintBool ( {
+            aexpr = AECst {
+              aconst = ACVar (Vlocal (Idmap.find id env.local_env));
+              typ = (TInt, ESet (Effset.empty))
+            };
+            typ = (TUnit, singleton_eff Div)
+        });
+          typ = (TUnit, singleton_eff Div) })
+        with _ ->
+        (AECst {
+          aconst = ACallPrintBool ( {
+            aexpr = AECst {
+              aconst = ACVar (Vclos (Idmap.find id env.local_env));
+              typ = (TInt, ESet (Effset.empty))
+            };
+            typ = (TUnit, singleton_eff Div)
+        });
+          typ = (TUnit, singleton_eff Div) })
+        end
+      | TVar {id = _; def = Some (TString,_)},_ -> 
+        begin
+        try 
+        (AECst {
+          aconst = ACallPrintString ({
+            aexpr = AECst {
+              aconst = ACVar (Vlocal (Idmap.find id env.local_env));
+              typ = (TInt, ESet (Effset.empty))
+            };
+            typ = (TUnit, singleton_eff Div)
+        });
+          typ = (TUnit, singleton_eff Div) })
+        with _ ->
+        
+        (AECst {
+          aconst = ACallPrintString ( {
+            aexpr = AECst {
+              aconst = ACVar (Vclos (Idmap.find id env.local_env));
+              typ = (TInt, ESet (Effset.empty))
+            };
+            typ = (TUnit, singleton_eff Div)
+        });
+          typ = (TUnit, singleton_eff Div) })
+        end
+      | _ -> failwith "pas implémenté"
+    end
     | _ -> failwith "non implémenté"
+
+let give_label p =
+  (* donne le nom d'un label libre *)
+  incr n_label;
+  "label_"^(string_of_int !n_label)
 
 let int_of_bool b =
   if b then 1 else 0
@@ -103,7 +172,3 @@ let free_variables (b: tfunbody) env =
   let content = b.tbody.tcontent
   in List.fold_left 
   (fun s arg -> VarMap.remove arg s) (free_expr content.texpr env) args *)
-
-let give_label p =
-  incr n_label;
-  "label_"^(string_of_int !n_label)
